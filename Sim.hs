@@ -186,6 +186,7 @@ newtype TerrInPlay   = TerrInPlay   [ITerritory]  deriving (         Show)
 newtype TerrDeck     = TerrDeck     [ITerritory]  deriving (         Show)
 newtype MercsInPlay  = MercsInPlay  [IMerc]       deriving (         Show)
 newtype MercsDeck    = MercsDeck    [IMerc]       deriving (         Show)
+newtype Sitting      = Sitting      [IGang]       deriving (         Show)
 
 type family Index a where
   Index Player    = IPlayer
@@ -208,11 +209,11 @@ deriving instance Show WHench
 proof = WGangman Chemist1
 
 data BattleCry
-  = BattleCry [Action] | NoBattleCry
+  =  BattleCry [Action] | NoBattleCry
   deriving Show
 
 data Capture
-  = Capture [Action] | NoCapture
+  =  Capture [Action] | NoCapture
   deriving Show
 
 
@@ -409,6 +410,16 @@ data Squad
 
 -- * Actions
 
+-- game_state_next_action ∷ GameState
+
+data IAction
+  = IInitialTerrDeck
+  | IInitialMercsDeck
+  | IMoveMercsIntoPlay
+  | IInitialDeckBaseHand
+  | IPlayerSitting
+  deriving (Enum, Eq, Ord, Show)
+
 data Action
   = InitialTerrDeck         { player_gangs        ∷ [IGang]
                             , new_global_terrs    ∷ TerrDeck }
@@ -421,16 +432,18 @@ data Action
                             , new_closed_open     ∷ (MercsDeck, MercsInPlay) }
   | InitialDeckBaseHand     { player_gang         ∷ IGang
                             , base_size           ∷ Int
-                            , deck_base_hand      ∷ (PlayerDeck, PlayerBase, PlayerHand)}
+                            , deck_base_hand      ∷ (PlayerDeck, PlayerBase, PlayerHand) }
+  | PlayerSitting           { player_gangs        ∷ [IGang]
+                            , sitting             ∷ Sitting }
   deriving Show
 
-play_action x@(InitialTerrDeck  player_gangs _)
+complete_action x@(InitialTerrDeck  player_gangs _)
   = x { new_global_terrs =
         let game_size = length player_gangs
         in TerrDeck ∘ map fst ∘ (flip filter) game_territories $
             \(iterr, (_, _, AtSizes allowed_sizes)) → game_size ∈ allowed_sizes }
 
-play_action x@(InitialMercsDeck player_gangs merc_multiplier _)
+complete_action x@(InitialMercsDeck player_gangs merc_multiplier _)
   = x { new_closed_mercs =
         let
         in MercsDeck ∘ shuffle_list ∘ (flip foldMap) game_gangs $
@@ -439,13 +452,13 @@ play_action x@(InitialMercsDeck player_gangs merc_multiplier _)
                then foldl (++) [] $ take merc_multiplier $ repeat imercs
                else [] }
 
-play_action x@(MoveMercsIntoPlay nmercs (MercsDeck deck) (MercsInPlay inplay) _)
+complete_action x@(MoveMercsIntoPlay nmercs (MercsDeck deck) (MercsInPlay inplay) _)
   = x { new_closed_open =
         let (new_deck, new_inplay) = move_cards nmercs deck inplay
         in ( MercsDeck new_deck
            , MercsInPlay new_inplay ) }
 
-play_action x@(InitialDeckBaseHand gang base_size _)
+complete_action x@(InitialDeckBaseHand gang base_size _)
   = x { deck_base_hand =
         let GangDeck gangmen = igang_deck gang
             wgang_has_capture (WGangman _ _ _ capture) | NoCapture ← capture = False
@@ -457,11 +470,14 @@ play_action x@(InitialDeckBaseHand gang base_size _)
            , PlayerBase $ fmap CGangman base
            , PlayerHand $ fmap CGangman hand ) }
 
+complete_action x@(PlayerSitting gangs _)
+  = x { sitting = Sitting $ shuffle_list gangs }
+
 
 -- * Game phases
 
-data GamePhase
-  =  GlobalDecksMercs -- 1. populate terrs_closed =
+data Phase
+  =  InitialTerrsMercs -- 1. populate terrs_closed =
                       --      case 4 → gen 2 Water ++ gen 2 Drugs ++ gen 2 Gas ++ gen 2 Ammo ++ gen 4 Scrap ++ gen 4 Services
                       --      case 3 → gen 2 Water ++ gen 0 Drugs ++ gen 2 Gas ++ gen 2 Ammo ++ gen 3 Scrap ++ gen 3 Services
                       --      case 2 → gen 1 Water ++ gen 1 Drugs ++ gen 1 Gas ++ gen 1 Ammo ++ gen 2 Scrap ++ gen 2 Services
@@ -472,31 +488,20 @@ data GamePhase
                       --                 if mercidx_enabling_gang midx = pgang then gen 3 midx else []
                       -- 3. move 3 mercs_closed → mercs_current
 
-  |  PlayerHandsDecks -- forM players $
+  |  PlayerDecksBasesHands -- forM players $
                       --   \player →
                       --      let cards = pl_init_cards $ pl_gang player
                       --      pl_deck player <- shuffle $ gang_init_deck cards
                       --      pl_base player <- gang_init_base $ pl_gang player
                       --      (pl_hand player, pl_deck player) <- (take 4 pl_deck, skip 4 pl_deck)
 
-  |  OrderPlayers     -- 1. elect a permanent, random, continious order of players
+  |  SitPlayers       -- 1. elect a permanent, random, continious order of players
                       -- 2. sit players according to order
 
-  |  GameDays         -- repeat while (length terr_current) > 0
+  |  NewTerritories   -- take (length players) terr_closed → terr_current
+                      --   initialize with terr_init_swag
 
-  |  ScoreCount       -- invariant: no (current + closed) territories left
-                      -- winner:
-                      --   let max_score = max player_score players
-                      --       winners   = filter (player_score = max_score) players
-                      --       max_terrs = max pl_terrs winners
-                      --       winners2  = filter (pl_terrs = max_terrs) winners
-                      --       pl_mercs  = length (filter is_merc (pl_deck ++ pl_base ++ pl_hand))
-                      --       max_mercs = max pl_mercs winners2
-                      --       winners3  = filter (pl_mercs = max_mercs) winners2
-                      --       winner    = max enumIndex winners3
-
-data RoundPhase
-  =  HireHenchs       -- 1. 0 to 1             Merc    merc_current → pl_hand
+  |  HireHenchs       -- 1. 0 to 1             Merc    merc_current → pl_hand
                       -- 2. if took merc
                       --         1                 head merc_closed → merc_current
 
@@ -542,18 +547,23 @@ data RoundPhase
                       --                      take 1 random merc_closed → pl_hand
                       --                      take 1 fanatic            → pl_base
                       --                      take 2 slaves             → pl_base
-  deriving (Enum, Show)
-
-data DayPhase
-  =  NewTerritories   -- take (length players) terr_closed → terr_current
-                      --   initialize with terr_init_swag
-
-  |  PlayersRounds    -- repeat while (length terr_current) > 0
+  -- PlayersRounds    -- repeat while (length terr_current) > 0
 
   |  UntapHenchs      -- forM pl_base . players $
                       --   \henchman → do $
                       --     ah_untapped henchman → True
-  deriving (Enum, Show)
+
+  |  ScoreCount       -- invariant: no (current + closed) territories left
+                      -- winner:
+                      --   let max_score = max player_score players
+                      --       winners   = filter (player_score = max_score) players
+                      --       max_terrs = max pl_terrs winners
+                      --       winners2  = filter (pl_terrs = max_terrs) winners
+                      --       pl_mercs  = length (filter is_merc (pl_deck ++ pl_base ++ pl_hand))
+                      --       max_mercs = max pl_mercs winners2
+                      --       winners3  = filter (pl_mercs = max_mercs) winners2
+                      --       winner    = max enumIndex winners3
+  deriving (Eq, Ord, Show)
 
 
 main = undefined
