@@ -6,7 +6,7 @@ let
 
   f = { mkDerivation, base, base-unicode-symbols, bytestring
       , cassava, containers, hashable, intero, optparse-applicative
-      , optparse-generic, stdenv, text, unordered-containers
+      , optparse-generic, random-shuffle, stdenv, text, unordered-containers
       }:
       mkDerivation {
         pname = "boardgamesim";
@@ -16,7 +16,7 @@ let
         isExecutable = true;
         executableHaskellDepends = [
           base base-unicode-symbols bytestring cassava containers hashable
-          intero optparse-applicative optparse-generic text
+          intero optparse-applicative optparse-generic random-shuffle text
           unordered-containers
         ];
         description = "Game simulator";

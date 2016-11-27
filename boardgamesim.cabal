@@ -58,6 +58,7 @@ executable sim
                      , hashable >= 1.2.3.3
                      , optparse-applicative
                      , optparse-generic
+                     , random-shuffle
                      , text
                      , unordered-containers >= 0.2.5.1
 
