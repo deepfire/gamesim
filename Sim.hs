@@ -410,6 +410,52 @@ data Squad
 -- * Actions
 
 data Action
+  = InitialTerrDeck         { player_gangs        ∷ [IGang]
+                            , new_global_terrs    ∷ TerrDeck }
+  | InitialMercsDeck        { player_gangs        ∷ [IGang]
+                            , merc_multiplier     ∷ Int
+                            , new_closed_mercs    ∷ MercsDeck }
+  | MoveMercsIntoPlay       { merc_count          ∷ Int
+                            , closed_mercs        ∷ MercsDeck
+                            , open_mercs          ∷ MercsInPlay
+                            , new_closed_open     ∷ (MercsDeck, MercsInPlay) }
+  | InitialDeckBaseHand     { player_gang         ∷ IGang
+                            , base_size           ∷ Int
+                            , deck_base_hand      ∷ (PlayerDeck, PlayerBase, PlayerHand)}
+  deriving Show
+
+play_action x@(InitialTerrDeck  player_gangs _)
+  = x { new_global_terrs =
+        let game_size = length player_gangs
+        in TerrDeck ∘ map fst ∘ (flip filter) game_territories $
+            \(iterr, (_, _, AtSizes allowed_sizes)) → game_size ∈ allowed_sizes }
+
+play_action x@(InitialMercsDeck player_gangs merc_multiplier _)
+  = x { new_closed_mercs =
+        let
+        in MercsDeck ∘ shuffle_list ∘ (flip foldMap) game_gangs $
+            \(igang, (EnablesMercs imercs, _))
+             → if igang ∈ player_gangs
+               then foldl (++) [] $ take merc_multiplier $ repeat imercs
+               else [] }
+
+play_action x@(MoveMercsIntoPlay nmercs (MercsDeck deck) (MercsInPlay inplay) _)
+  = x { new_closed_open =
+        let (new_deck, new_inplay) = move_cards nmercs deck inplay
+        in ( MercsDeck new_deck
+           , MercsInPlay new_inplay ) }
+
+play_action x@(InitialDeckBaseHand gang base_size _)
+  = x { deck_base_hand =
+        let GangDeck gangmen = igang_deck gang
+            wgang_has_capture (WGangman _ _ _ capture) | NoCapture ← capture = False
+                                                       | Capture _ ← capture = True
+            shuffled         = shuffle_list gangmen
+            (base, rest)     = split_by base_size wgang_has_capture gangmen
+            (deck, hand)     = splitAt 4 rest
+        in ( PlayerDeck $ deck
+           , PlayerBase $ fmap CGangman base
+           , PlayerHand $ fmap CGangman hand ) }
 
 
 -- * Game phases
