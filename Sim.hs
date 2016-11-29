@@ -1,3 +1,4 @@
+
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
@@ -398,6 +399,7 @@ data GameState
   =  GameState {
       gs_field        ∷ Field
     , gs_players      ∷ [Player]
+    , gs_current      ∷ IPlayer
     }
   deriving (Show)
 
@@ -437,6 +439,25 @@ data Action
                             , sitting             ∷ Sitting }
   deriving Show
 
+next_phase ∷ GameState → Phase → Phase
+next_phase (GameState (Field cur_terr cur_merc clo_terr clo_merc) players icur)
+           p
+  | CheckDayEnd  ← p = if length cur_terr > 0
+                       then DayPlayerBegin
+                       else succ p
+  | CheckGameEnd ← p = if length cur_terr + length clo_terr > 0
+                       then DayPlayerBegin
+                       else succ p
+  | GameEnd      ← p = error "Asked to continue game past GameEnd."
+  | otherwise        = succ p
+
+-- run_action ∷ GameState → Action → GameState
+-- run_action (GameState (Field cur_terr cur_merc clo_terr clo_merc) players icur)
+--            act
+--   | (InitialTerrDeck  player_gangs _) ← act
+--     → 
+
+complete_action :: Action → Action
 complete_action x@(InitialTerrDeck  player_gangs _)
   = x { new_global_terrs =
         let game_size = length player_gangs
@@ -477,7 +498,9 @@ complete_action x@(PlayerSitting gangs _)
 -- * Game phases
 
 data Phase
-  =  InitialTerrsMercs -- 1. populate terrs_closed =
+  =  GameBegin
+
+  |  InitialTerrsMercs -- 1. populate terrs_closed =
                       --      case 4 → gen 2 Water ++ gen 2 Drugs ++ gen 2 Gas ++ gen 2 Ammo ++ gen 4 Scrap ++ gen 4 Services
                       --      case 3 → gen 2 Water ++ gen 0 Drugs ++ gen 2 Gas ++ gen 2 Ammo ++ gen 3 Scrap ++ gen 3 Services
                       --      case 2 → gen 1 Water ++ gen 1 Drugs ++ gen 1 Gas ++ gen 1 Ammo ++ gen 2 Scrap ++ gen 2 Services
@@ -501,6 +524,10 @@ data Phase
   |  NewTerritories   -- take (length players) terr_closed → terr_current
                       --   initialize with terr_init_swag
 
+  |  ChoosePlayer     -- ...
+
+  |  DayPlayerBegin
+
   |  HireHenchs       -- 1. 0 to 1             Merc    merc_current → pl_hand
                       -- 2. if took merc
                       --         1                 head merc_closed → merc_current
@@ -523,7 +550,7 @@ data Phase
                       --    all     Fanatic         pl_attack_squad → Void
                       -- 5. player may activate Capture for any/all henchmen of pl_attack_squad
 
-  | HarvestSwag       -- forM (filter (at_owner = pl_gang) terr_current) $
+  |  HarvestSwag      -- forM (filter (at_owner = pl_gang) terr_current) $
                       --   \terr →
                       --     case at_swag terr of
                       --       0 → return
@@ -532,7 +559,7 @@ data Phase
                       --         pl_swag = pl_swag + 1
                       -- 1. pl_swag = pl_swag + length $
 
-  | TerritoryOwning   -- forM terr_current $
+  |  TerritoryOwning  -- forM terr_current $
                       --   \terr → do
                       --     if at_swag = 0
                       --     then case at_owner terr
@@ -540,21 +567,23 @@ data Phase
                       --                             (shuffled at_henchmen) → bottom_of (pl_deck owner)
                       --            Nothing    → do terr → Void
 
-  | GetHenchs         -- 1. (shuffled pl_hand) → bottom_of pl_deck
+  |  GetHenchs        -- 1. (shuffled pl_hand) → bottom_of pl_deck
                       -- 2.     case length pl_deck
                       --          1..4   → take 1..4 pl_deck → pl_hand
                       --             0   → case player_choice of
                       --                      take 1 random merc_closed → pl_hand
                       --                      take 1 fanatic            → pl_base
                       --                      take 2 slaves             → pl_base
-  -- PlayersRounds    -- repeat while (length terr_current) > 0
+
+  |  CheckDayEnd      -- repeat while (length terr_current) > 0
 
   |  UntapHenchs      -- forM pl_base . players $
                       --   \henchman → do $
                       --     ah_untapped henchman → True
 
-  |  ScoreCount       -- invariant: no (current + closed) territories left
-                      -- winner:
+  |  CheckGameEnd     -- repeat while (current + closed) territories left
+
+  |  ScoreCount       -- winner:
                       --   let max_score = max player_score players
                       --       winners   = filter (player_score = max_score) players
                       --       max_terrs = max pl_terrs winners
@@ -563,7 +592,9 @@ data Phase
                       --       max_mercs = max pl_mercs winners2
                       --       winners3  = filter (pl_mercs = max_mercs) winners2
                       --       winner    = max enumIndex winners3
-  deriving (Eq, Ord, Show)
+
+  |  GameEnd
+  deriving (Enum, Eq, Ord, Show)
 
 
 main = undefined
