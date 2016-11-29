@@ -81,18 +81,18 @@ data IGang
   deriving (Enum, Eq, Ord, Show)
 
 data IMerc
-  =  Barkeeper
-  |  Abomination
-  |  Preacher
-  |  Grabber
-  |  Flamer
-  |  Drummer
-  |  Madcap
+  =  Grasper
   |  Guitarist
-  |  Taskmaster
+  |  Madcap
+  |  Prothrall
+  |  Bonecrusher
+  |  Preacher
+  |  Drummer
+  |  Bounder
+  |  Barkeeper
+  |  BlackWidow
+  |  Striker
   |  Dealess
-  |  Widow
-  |  Conman
   deriving (Enum, Eq, Ord, Show)
 
 data family IGangman (igang ∷ IGang) ∷ *
@@ -227,25 +227,25 @@ game_henchmen
     , (Slave,     (Attack 0,  Defence 1)) ]
 
 game_territories
-  = [ (TerrW1,    (Water,     Swag 1,   AtSizes [2, 3, 4]))
-    , (TerrW2,    (Water,     Swag 1,   AtSizes [   3, 4]))
-    , (TerrD1,    (Drugs,     Swag 2,   AtSizes [2,    4]))
-    , (TerrD2,    (Drugs,     Swag 2,   AtSizes [      4]))
-    , (TerrG1,    (Gas,       Swag 3,   AtSizes [2, 3, 4]))
-    , (TerrG2,    (Gas,       Swag 3,   AtSizes [   3, 4]))
-    , (TerrA1,    (Ammo,      Swag 3,   AtSizes [2, 3, 4]))
-    , (TerrA2,    (Ammo,      Swag 3,   AtSizes [   3, 4]))
-    , (TerrP1,    (Scrap,     Swag 2,   AtSizes [2, 3, 4]))
-    , (TerrP2,    (Scrap,     Swag 2,   AtSizes [2, 3, 4]))
-    , (TerrP3,    (Scrap,     Swag 2,   AtSizes [   3, 4]))
-    , (TerrP4,    (Scrap,     Swag 2,   AtSizes [      4]))
-    , (TerrV1,    (Services,  Swag 1,   AtSizes [2, 3, 4]))
-    , (TerrV2,    (Services,  Swag 1,   AtSizes [2, 3, 4]))
-    , (TerrV3,    (Services,  Swag 1,   AtSizes [   3, 4]))
-    , (TerrV4,    (Services,  Swag 1,   AtSizes [      4])) ]
+  = [ (TerrW1_ForbiddenRiver,    (Water,     Swag 5,   AtSizes [2, 3, 4]))
+    , (TerrW2_CitadelOfFlayedOne,    (Water,     Swag 5,   AtSizes [   3, 4]))
+    , (TerrD1_ChurchRevelationOfTheProphet,    (Drugs,     Swag 5,   AtSizes [2,    4]))
+    , (TerrD2_ClinicEternalLife,    (Drugs,     Swag 5,   AtSizes [      4]))
+    , (TerrG1_OilPumpOfHottyFred,    (Gas,       Swag 5,   AtSizes [2, 3, 4]))
+    , (TerrG2_RainbowLake,    (Gas,       Swag 5,   AtSizes [   3, 4]))
+    , (TerrA1_BulletFarm,    (Ammo,      Swag 5,   AtSizes [2, 3, 4]))
+    , (TerrA2_ArmoryOfMagniKrugger,    (Ammo,      Swag 5,   AtSizes [   3, 4]))
+    , (TerrP1_IronTown,    (Scrap,     Swag 4,   AtSizes [2, 3, 4]))
+    , (TerrP2_SmelteryOfHragBakster,    (Scrap,     Swag 4,   AtSizes [2, 3, 4]))
+    , (TerrP3_ShiningBurialGrounds,    (Scrap,     Swag 4,   AtSizes [   3, 4]))
+    , (TerrP4_FactoryMechanicalMessiah,    (Scrap,     Swag 4,   AtSizes [      4]))
+    , (TerrV1_BarTheLastDrop,    (Services,  Swag 4,   AtSizes [2, 3, 4]))
+    , (TerrV2_BrothelKittiesOfTheMaster,    (Services,  Swag 4,   AtSizes [2, 3, 4]))
+    , (TerrV3_FightingPitBloodAndConcrete,    (Services,  Swag 4,   AtSizes [   3, 4]))
+    , (TerrV4_CasinoStElmosFires,    (Services,  Swag 4,   AtSizes [      4])) ]
 
 game_gangs
-  = [ (Valkiry,   (EnablesMercs [Dealess,    Widow],
+  = [ (Valkiry,   (EnablesMercs [Grasper,    Guitarist],
                    GangDeck [ WGangman ValkLead    1
                                NoBattleCry
                                NoCapture
@@ -258,7 +258,7 @@ game_gangs
                             , WGangman Valk3       3
                                NoBattleCry
                                NoCapture ]))
-    , (Gents,     (EnablesMercs [Preacher,   Conman],
+    , (Gents,     (EnablesMercs [Madcap,   Prothrall],
                    GangDeck [ WGangman GentLead    1
                                NoBattleCry
                                NoCapture
@@ -271,7 +271,7 @@ game_gangs
                             , WGangman Gent3       3
                                NoBattleCry
                                NoCapture ]))
-    , (Patrol,    (EnablesMercs [Grabber,    Guitarist],
+    , (Patrol,    (EnablesMercs [Bonecrusher,    Preacher],
                    GangDeck [ WGangman PatrolLead  1
                                NoBattleCry
                                NoCapture
@@ -284,7 +284,7 @@ game_gangs
                             , WGangman Patrol3     3
                                NoBattleCry
                                NoCapture ]))
-    , (Slavers,   (EnablesMercs [Taskmaster, Abomination],
+    , (Slavers,   (EnablesMercs [Drummer, Bounder],
                    GangDeck [ WGangman SlaverLead  1
                                NoBattleCry
                                NoCapture
@@ -297,7 +297,7 @@ game_gangs
                             , WGangman Slaver3     3
                                NoBattleCry
                                NoCapture ]))
-    , (Gunners,   (EnablesMercs [Flamer,     Madcap],
+    , (Gunners,   (EnablesMercs [Barkeeper,     BlackWidow],
                    GangDeck [ WGangman GunnerLead  1
                                NoBattleCry
                                NoCapture
@@ -310,7 +310,7 @@ game_gangs
                             , WGangman Gunner3     3
                                NoBattleCry
                                NoCapture ]))
-    , (Chemists,  (EnablesMercs [Barkeeper,  Guitarist],
+    , (Chemists,  (EnablesMercs [Striker,  Dealess],
                    GangDeck [ WGangman ChemistLead 1
                                NoBattleCry
                                NoCapture
@@ -509,7 +509,7 @@ data Phase
                       --      sum $ mapProduct (enumerate ∷ MercIndex) (map pl_gang players) $
                       --              \(midx, pgang) →
                       --                 if mercidx_enabling_gang midx = pgang then gen 3 midx else []
-                      -- 3. move 3 mercs_closed → mercs_current
+                      -- 3. move 2 mercs_closed → mercs_current
 
   |  PlayerDecksBasesHands -- forM players $
                       --   \player →
@@ -598,3 +598,63 @@ data Phase
 
 
 main = undefined
+
+-- ПОЯСНЕНИЯ ПО ТЕРМИНАМ
+-- Permanent - Постоянно действующее свойство Подручного.
+-- Holder - Удерживающий Территорию игрок, т.е. игрок, у которого есть Подручные на этой Территории.
+-- ...beat Henchman from Territory... - Holder Территории возвращает на свою Базу с неё указанное число любых или конкретных 
+-- Подручных, изнуренными или свежими.
+-- ...Trash this Henchman... - Указанный Подручный или несколько перемешиваются и помещаются под колоду владельца.
+-- 
+-- Valkyrez
+-- Mary «Right Executess»	Battlecry:	Choose in your hand and remove from the game 3 cards or less. Put on your Base equal number of untapped Henchmen from your hand and\or top of your Deck. They Battlecry skills don't works.
+-- Saviess	Battlecry:	Choose one Henchman on your Territory. Beat it untapped. Play its Battlecry skill.
+-- Robbess	Capture:	Choose one Henchman in your hand. Put it on your Base tapped. It Battlecry skill don't works.
+-- Nomadess	Capture:	Choose one Henchman on your Base. Move its to this Territory. It Capture skill don't works.
+-- 
+-- Gentz
+-- Germont «Young Baron»	Battlecry:	Choose in your hand and remove from the game 3 cards or less. Choose on your Base equal number of different Henchmen. Play they Battlecry skills.
+-- Temptress	Battlecry:	Choose from OPEN_MERCS any one Merc Henchman and put it on your Base untapped. It Battlecry skill don't works. Tap Temptress.
+-- Bodyguard	Capture:	Choose one Henchman in your hand. Put it on your Base untapped. It Battlecry skill don't works. Trash Bodyguard.
+-- Smartass	Capture:	Choose any one Henchman on your Base. Play it Battlecry skill.
+-- 
+-- Patrolz
+-- Carl «Bookkeeper»	Battlecry:	Choose in your hand and remove from the game 3 cards or less. Remove from the game double number of Swag tokens on any Territories in any combination.
+-- Devastator	Battlecry:	Choose any Territory. Remove from the game a Swag token from it. Beat tapped Henchman from it.
+-- Sapper	Capture:	Remove from the game a Swag token from this Territory.
+-- Gambit	Capture:	Choose two different Territories. Move a Swag token from one to another. Beat Gambit untapped.
+-- 
+-- Slaverz
+-- Leo «Kind Daddy»	Battlecry:	Choose in your hand and remove from the game 3 cards or less. Put on your Base double number of untapped Thrall Henchmen.
+-- Teamster	Battlecry:	In this gameround power of Thrall Henchmen considered.
+-- Wardess	Capture:	Trash up to two your Henchmen on this Territory. Remove from the game equal number of Swag tokens from this Territory.
+-- Huntsman	Capture:	Put one Thrall Henchman on this Territory.
+-- 
+-- Gunnerz
+-- Billy «Bullet Head»	Battlecry:	Choose in your hand and remove from the game 3 cards or less. Beat tapped from the game double number of Henchmen on any Territories in any combination.
+-- Explodess	Battlecry:	Choose any one Territory. Beat one Henchman from it tapped.
+-- Flamer	Capture:	Trash all your Henchmans from this Territory. Remove from the game this Territory and all Swag tokens on it.
+-- Looter	Capture:	Take Swag token from this Territory immediately. Beat Looter tapped.
+-- 
+-- Chemz
+-- Angelina «Pure Blood»	Battlecry:	Choose in your hand and remove from the game 3 cards or less. Put on your Base equal number of untapped Fanatic Henchmen.
+-- Dodger	Battlecry:	Choose any one Henchman on any Base. Trash it. Put untapped Fanatic Henchman on your Base.
+-- Patcher	Capture:	Choose on your Base tapped Henchman. Untap it. It Battlecry skill don't works.
+-- Madman	Capture:	Beat Madman tapped. Put untapped Fanatic Henchman on your Base.
+-- 
+-- Mercz
+-- Grasper	Battlecry:	Choose any Territory. Take a Swag token from it.
+-- Guitarist	Battlecry:	Beat up to two your Henchmen untapped from one or different Territories.
+-- Madcap	Battlecry:	Choose one Henchman in your hand. Put it on your Base untapped. It Battlecry skill don't works.
+-- Prothrall	Battlecry:	Choose any one Henchman on any Base. Trash it. Put one Thrall Henchman on your Base untapped.
+-- Bonecrusher	Battlecry:	Choose up to two Henchmen on your Base. Play Battlecry skills of them. Trash choosen Henchmen.
+-- Preacher	Battlecry:	Choose two untapped Henchmans on your Base. Trash it. Put two untapped Fanatic Henchman on your Base.
+-- Drummer	Battlecry:	Choose any one Henchman on your Base. If it tapped, untap it. Play its Battlecry skill.
+-- Bounder	Battlecry:	Remove from the game a Swag token from each Territories.
+-- Barkeeper	Battlecry:	Choose up to two tapped Henchman on your Base. Untap it. It Battlecry skill don't works.
+-- BlackWidow	Battlecry:	Each opponent choose one untapped Henchman from his Base and trash it.
+-- Striker	Battlecry:	Choose any Territory. Remove from the game two Swag tokens from it.
+-- Dealess	Battlecry:	In this gameround you cam attack twice, two different Territories. Effect do not stack.
+-- 
+-- Thrall	Permanent:	Power of Slave Henchman doesn't impact. Immediately remove it from the game after it return to the Territory to Base or trash it.
+-- Fanatic	Permanent:	Power of Fanatic Henchman has impact as two Henchmen. Immediately remove it from the game after capture Territory or trash it.
