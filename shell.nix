@@ -7,6 +7,7 @@ let
   f = { mkDerivation, base, base-unicode-symbols, bytestring
       , cassava, containers, hashable, intero, optparse-applicative
       , optparse-generic, random-shuffle, stdenv, text, unordered-containers
+      , freer
       }:
       mkDerivation {
         pname = "boardgamesim";
@@ -18,6 +19,7 @@ let
           base base-unicode-symbols bytestring cassava containers hashable
           intero optparse-applicative optparse-generic random-shuffle text
           unordered-containers
+	  freer
         ];
         description = "Game simulator";
         license = stdenv.lib.licenses.agpl3;
