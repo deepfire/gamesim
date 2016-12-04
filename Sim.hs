@@ -1,8 +1,8 @@
-
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
@@ -13,13 +13,16 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnicodeSyntax #-}
 {-# LANGUAGE ViewPatterns #-}
--- module Sim
---   ()
--- where
+module Sim
+  ()
+where
 
 
+import           Control.Monad.Freer
+import           Control.Monad.Freer.Internal
 import           Data.Maybe
 import           Data.List
 import qualified Data.Set              as S
@@ -156,22 +159,22 @@ data IHench
   deriving (Eq, Ord, Show)
 
 data ITerritory
-  =  TerrW1
-  |  TerrW2
-  |  TerrD1
-  |  TerrD2
-  |  TerrG1
-  |  TerrG2
-  |  TerrA1
-  |  TerrA2
-  |  TerrP1
-  |  TerrP2
-  |  TerrP3
-  |  TerrP4
-  |  TerrV1
-  |  TerrV2
-  |  TerrV3
-  |  TerrV4
+  =  ForbiddenRiver
+  |  CitadelOfFlayedOne
+  |  ChurchRevelationOfTheProphet
+  |  ClinicEternalLife
+  |  OilPumpOfHottyFred
+  |  RainbowLake
+  |  BulletFarm
+  |  ArmoryOfMagniKrugger
+  |  IronTown
+  |  SmelteryOfHragBakster
+  |  ShiningBurialGrounds
+  |  FactoryMechanicalMessiah
+  |  BarTheLastDrop
+  |  BrothelKittiesOfTheMaster
+  |  FightingPitBloodAndConcrete
+  |  CasinoStElmosFires
   deriving (Eq, Ord, Show)
 
 newtype Attack       = Attack       Int           deriving (Eq, Num, Show)
@@ -183,10 +186,10 @@ newtype GangDeck     = GangDeck     [WGangman]    deriving (         Show)
 newtype PlayerDeck   = PlayerDeck   [WGangman]    deriving (         Show)
 newtype PlayerBase   = PlayerBase   [WHench]      deriving (         Show)
 newtype PlayerHand   = PlayerHand   [WHench]      deriving (         Show)
-newtype TerrInPlay   = TerrInPlay   [ITerritory]  deriving (         Show)
+newtype TerrsInPlay  = TerrsInPlay  [ITerritory]  deriving (         Show)
 newtype TerrDeck     = TerrDeck     [ITerritory]  deriving (         Show)
 newtype MercsInPlay  = MercsInPlay  [IMerc]       deriving (         Show)
-newtype MercsDeck    = MercsDeck    [IMerc]       deriving (         Show)
+newtype MercDeck     = MercDeck     [IMerc]       deriving (         Show)
 newtype Sitting      = Sitting      [IGang]       deriving (         Show)
 
 type family Index a where
@@ -210,11 +213,11 @@ deriving instance Show WHench
 proof = WGangman Chemist1
 
 data BattleCry
-  =  BattleCry [Action] | NoBattleCry
+  =  BattleCry [Action ()] | NoBattleCry
   deriving Show
 
 data Capture
-  =  Capture [Action] | NoCapture
+  =  Capture [Action ()] | NoCapture
   deriving Show
 
 
@@ -227,22 +230,22 @@ game_henchmen
     , (Slave,     (Attack 0,  Defence 1)) ]
 
 game_territories
-  = [ (TerrW1_ForbiddenRiver,    (Water,     Swag 5,   AtSizes [2, 3, 4]))
-    , (TerrW2_CitadelOfFlayedOne,    (Water,     Swag 5,   AtSizes [   3, 4]))
-    , (TerrD1_ChurchRevelationOfTheProphet,    (Drugs,     Swag 5,   AtSizes [2,    4]))
-    , (TerrD2_ClinicEternalLife,    (Drugs,     Swag 5,   AtSizes [      4]))
-    , (TerrG1_OilPumpOfHottyFred,    (Gas,       Swag 5,   AtSizes [2, 3, 4]))
-    , (TerrG2_RainbowLake,    (Gas,       Swag 5,   AtSizes [   3, 4]))
-    , (TerrA1_BulletFarm,    (Ammo,      Swag 5,   AtSizes [2, 3, 4]))
-    , (TerrA2_ArmoryOfMagniKrugger,    (Ammo,      Swag 5,   AtSizes [   3, 4]))
-    , (TerrP1_IronTown,    (Scrap,     Swag 4,   AtSizes [2, 3, 4]))
-    , (TerrP2_SmelteryOfHragBakster,    (Scrap,     Swag 4,   AtSizes [2, 3, 4]))
-    , (TerrP3_ShiningBurialGrounds,    (Scrap,     Swag 4,   AtSizes [   3, 4]))
-    , (TerrP4_FactoryMechanicalMessiah,    (Scrap,     Swag 4,   AtSizes [      4]))
-    , (TerrV1_BarTheLastDrop,    (Services,  Swag 4,   AtSizes [2, 3, 4]))
-    , (TerrV2_BrothelKittiesOfTheMaster,    (Services,  Swag 4,   AtSizes [2, 3, 4]))
-    , (TerrV3_FightingPitBloodAndConcrete,    (Services,  Swag 4,   AtSizes [   3, 4]))
-    , (TerrV4_CasinoStElmosFires,    (Services,  Swag 4,   AtSizes [      4])) ]
+  = [ (ForbiddenRiver,                 (Water,     Swag 5,   AtSizes [2, 3, 4]))
+    , (CitadelOfFlayedOne,             (Water,     Swag 5,   AtSizes [   3, 4]))
+    , (ChurchRevelationOfTheProphet,   (Drugs,     Swag 5,   AtSizes [2,    4]))
+    , (ClinicEternalLife,              (Drugs,     Swag 5,   AtSizes [      4]))
+    , (OilPumpOfHottyFred,             (Gas,       Swag 5,   AtSizes [2, 3, 4]))
+    , (RainbowLake,                    (Gas,       Swag 5,   AtSizes [   3, 4]))
+    , (BulletFarm,                     (Ammo,      Swag 5,   AtSizes [2, 3, 4]))
+    , (ArmoryOfMagniKrugger,           (Ammo,      Swag 5,   AtSizes [   3, 4]))
+    , (IronTown,                       (Scrap,     Swag 4,   AtSizes [2, 3, 4]))
+    , (SmelteryOfHragBakster,          (Scrap,     Swag 4,   AtSizes [2, 3, 4]))
+    , (ShiningBurialGrounds,           (Scrap,     Swag 4,   AtSizes [   3, 4]))
+    , (FactoryMechanicalMessiah,       (Scrap,     Swag 4,   AtSizes [      4]))
+    , (BarTheLastDrop,                 (Services,  Swag 4,   AtSizes [2, 3, 4]))
+    , (BrothelKittiesOfTheMaster,      (Services,  Swag 4,   AtSizes [2, 3, 4]))
+    , (FightingPitBloodAndConcrete,    (Services,  Swag 4,   AtSizes [   3, 4]))
+    , (CasinoStElmosFires,             (Services,  Swag 4,   AtSizes [      4])) ]
 
 game_gangs
   = [ (Valkiry,   (EnablesMercs [Grasper,    Guitarist],
@@ -388,10 +391,10 @@ data Player
 
 data Field
   =  Field {
-      fi_terr_current ∷ [Territory]  -- 1 to 4
-    , fi_merc_current ∷ [IHench]     -- mercs only
-    , fi_terr_closed  ∷ [ITerritory]
-    , fi_merc_closed  ∷ [IHench]     -- mercs only
+      fi_terrsinplay  ∷ TerrsInPlay  -- 1 to 4
+    , fi_mercsinplay  ∷ MercsInPlay  -- mercs only
+    , fi_terrdeck     ∷ TerrDeck
+    , fi_mercdeck     ∷ MercDeck     -- mercs only
     }
   deriving (Show)
 
@@ -412,35 +415,109 @@ data Squad
 
 -- * Actions
 
--- game_state_next_action ∷ GameState
+runAction ∷ GameState → Eff '[Action] w → Eff '[] w
+runAction gs m = loop gs m where
+  loop ∷ GameState → Eff (Action ': r) w → Eff r w
+  loop gs (Val x) = return x
+  loop gs@(GameState fi@(Field ti@(TerrsInPlay ticards) mi@(MercsInPlay micards)
+                               td@(TerrDeck    tdcards) md@(MercDeck    mdcards))
+                     players icur)
+       (E u q) =
+    case decomp u of
+      Right act →
+        case act of
 
-data IAction
-  = IInitialTerrDeck
-  | IInitialMercsDeck
-  | IMoveMercsIntoPlay
-  | IInitialDeckBaseHand
-  | IPlayerSitting
-  deriving (Enum, Eq, Ord, Show)
+          DumpState →
+            k gs gs
 
-data Action
-  = InitialTerrDeck         { player_gangs        ∷ [IGang]
-                            , new_global_terrs    ∷ TerrDeck }
-  | InitialMercsDeck        { player_gangs        ∷ [IGang]
-                            , merc_multiplier     ∷ Int
-                            , new_closed_mercs    ∷ MercsDeck }
-  | MoveMercsIntoPlay       { merc_count          ∷ Int
-                            , closed_mercs        ∷ MercsDeck
-                            , open_mercs          ∷ MercsInPlay
-                            , new_closed_open     ∷ (MercsDeck, MercsInPlay) }
-  | InitialDeckBaseHand     { player_gang         ∷ IGang
-                            , base_size           ∷ Int
-                            , deck_base_hand      ∷ (PlayerDeck, PlayerBase, PlayerHand) }
-  | PlayerSitting           { player_gangs        ∷ [IGang]
-                            , sitting             ∷ Sitting }
-  deriving Show
+          EnterPlayers gangs →
+            let players = [ Player { pl_gang = g } | g ← gangs ]
+            in k (gs { gs_players = players }) players
+
+          InitialTerrDeck →
+            let game_size = length players
+                terrdeck  = TerrDeck ∘ map fst ∘ (flip filter) game_territories $
+                            \(iterr, (_, _, AtSizes allowed_sizes)) → game_size ∈ allowed_sizes
+            in k (gs { gs_field = fi { fi_terrdeck = terrdeck } }) terrdeck
+
+          InitialMercDeck merc_multiplier →
+            let gangs     = fmap pl_gang players
+                mercdeck  = MercDeck ∘ shuffle_list ∘ (flip foldMap) game_gangs $
+                            \(igang, (EnablesMercs imercs, _))
+                            → if igang ∈ gangs
+                              then foldl (++) [] $ take merc_multiplier $ repeat imercs
+                              else []
+            in k (gs { gs_field = fi { fi_mercdeck = mercdeck } }) mercdeck
+
+          MoveMercsIntoPlay nmercs →
+            let (new_mdcards, new_micards) = move_cards nmercs mdcards micards
+                (nmd, nmi)                 = (MercDeck new_mdcards, MercsInPlay new_micards)
+            in k (gs { gs_field = fi { fi_mercdeck    = nmd
+                                     , fi_mercsinplay = nmi } })
+                 (nmd, nmi)
+
+          InitialDeckBaseHand iplayer base_size →
+            let idx              = fromEnum iplayer
+                Player _ igang _ _ _ _ _ =
+                                   players !! idx -- XXX: non-total
+                GangDeck gangmen = igang_deck igang
+                wgang_has_capture (WGangman _ _ _ capture) | NoCapture ← capture = False
+                                                           | Capture _ ← capture = True
+                shuffled         = shuffle_list gangmen
+                (basecs, restcs) = split_by base_size wgang_has_capture gangmen
+                (deckcs, handcs) = splitAt 4 restcs
+                deck             = PlayerDeck $ deckcs
+                base             = PlayerBase $ fmap CGangman basecs
+                hand             = PlayerHand $ fmap CGangman handcs
+            in k (gs { gs_players =  })
+                 (nmd, nmi)
+
+-- complete_action x@(PlayerSitting gangs _)
+--   = x { sitting = Sitting $ shuffle_list gangs }
+--   = x { new_terrdeck =
+--         let game_size = length player_gangs
+--         in TerrDeck ∘ map fst ∘ (flip filter) game_territories $
+--             \(iterr, (_, _, AtSizes allowed_sizes)) → game_size ∈ allowed_sizes }
+          
+      Left u → E u (tsingleton (k gs))
+    where k s = qComp q (loop gs)
+
+runGameState ∷ GameState → Eff '[Action] GameState → GameState
+runGameState gs = run ∘ runAction gs
+
+game ∷ GameState
+game = runGameState (GameState {}) $ do
+  send $ EnterPlayers [Valkiry]
+  send DumpState
+
+data Action s where
+  DumpState ∷
+      Action GameState
+  EnterPlayers ∷
+    { player_gangs        ∷ [IGang] }
+    → Action [Player]
+  InitialTerrDeck ∷
+      Action TerrDeck
+  InitialMercDeck ∷
+    { merc_multiplier     ∷ Int }
+    → Action MercDeck
+  MoveMercsIntoPlay ∷
+    { merc_count          ∷ Int }
+    → Action (MercDeck, MercsInPlay)
+  PlayerSitting ∷
+    { sitting             ∷ Sitting }
+    → Action ()
+  InitialDeckBaseHand ∷
+    { player              ∷ IPlayer
+    , base_size           ∷ Int }
+    → Action (PlayerDeck, PlayerBase, PlayerHand)
+deriving instance Show (Action a)
 
 next_phase ∷ GameState → Phase → Phase
-next_phase (GameState (Field cur_terr cur_merc clo_terr clo_merc) players icur)
+next_phase (GameState (Field (TerrsInPlay cur_terr) (MercsInPlay cur_merc)
+                             (TerrDeck    clo_terr) (MercDeck    clo_merc))
+                      players
+                      icur)
            p
   | CheckDayEnd  ← p = if length cur_terr > 0
                        then DayPlayerBegin
@@ -451,54 +528,11 @@ next_phase (GameState (Field cur_terr cur_merc clo_terr clo_merc) players icur)
   | GameEnd      ← p = error "Asked to continue game past GameEnd."
   | otherwise        = succ p
 
--- run_action ∷ GameState → Action → GameState
--- run_action (GameState (Field cur_terr cur_merc clo_terr clo_merc) players icur)
---            act
---   | (InitialTerrDeck  player_gangs _) ← act
---     → 
-
-complete_action :: Action → Action
-complete_action x@(InitialTerrDeck  player_gangs _)
-  = x { new_global_terrs =
-        let game_size = length player_gangs
-        in TerrDeck ∘ map fst ∘ (flip filter) game_territories $
-            \(iterr, (_, _, AtSizes allowed_sizes)) → game_size ∈ allowed_sizes }
-
-complete_action x@(InitialMercsDeck player_gangs merc_multiplier _)
-  = x { new_closed_mercs =
-        let
-        in MercsDeck ∘ shuffle_list ∘ (flip foldMap) game_gangs $
-            \(igang, (EnablesMercs imercs, _))
-             → if igang ∈ player_gangs
-               then foldl (++) [] $ take merc_multiplier $ repeat imercs
-               else [] }
-
-complete_action x@(MoveMercsIntoPlay nmercs (MercsDeck deck) (MercsInPlay inplay) _)
-  = x { new_closed_open =
-        let (new_deck, new_inplay) = move_cards nmercs deck inplay
-        in ( MercsDeck new_deck
-           , MercsInPlay new_inplay ) }
-
-complete_action x@(InitialDeckBaseHand gang base_size _)
-  = x { deck_base_hand =
-        let GangDeck gangmen = igang_deck gang
-            wgang_has_capture (WGangman _ _ _ capture) | NoCapture ← capture = False
-                                                       | Capture _ ← capture = True
-            shuffled         = shuffle_list gangmen
-            (base, rest)     = split_by base_size wgang_has_capture gangmen
-            (deck, hand)     = splitAt 4 rest
-        in ( PlayerDeck $ deck
-           , PlayerBase $ fmap CGangman base
-           , PlayerHand $ fmap CGangman hand ) }
-
-complete_action x@(PlayerSitting gangs _)
-  = x { sitting = Sitting $ shuffle_list gangs }
-
 
 -- * Game phases
 
 data Phase
-  =  GameBegin
+  =  GameBegin        -- 1. choose player gangs
 
   |  InitialTerrsMercs -- 1. populate terrs_closed =
                       --      case 4 → gen 2 Water ++ gen 2 Drugs ++ gen 2 Gas ++ gen 2 Ammo ++ gen 4 Scrap ++ gen 4 Services
@@ -602,46 +636,46 @@ main = undefined
 -- ПОЯСНЕНИЯ ПО ТЕРМИНАМ
 -- Permanent - Постоянно действующее свойство Подручного.
 -- Holder - Удерживающий Территорию игрок, т.е. игрок, у которого есть Подручные на этой Территории.
--- ...beat Henchman from Territory... - Holder Территории возвращает на свою Базу с неё указанное число любых или конкретных 
+-- ...beat Henchman from Territory... - Holder Территории возвращает на свою Базу с неё указанное число любых или конкретных
 -- Подручных, изнуренными или свежими.
 -- ...Trash this Henchman... - Указанный Подручный или несколько перемешиваются и помещаются под колоду владельца.
--- 
+--
 -- Valkyrez
 -- Mary «Right Executess»	Battlecry:	Choose in your hand and remove from the game 3 cards or less. Put on your Base equal number of untapped Henchmen from your hand and\or top of your Deck. They Battlecry skills don't works.
 -- Saviess	Battlecry:	Choose one Henchman on your Territory. Beat it untapped. Play its Battlecry skill.
 -- Robbess	Capture:	Choose one Henchman in your hand. Put it on your Base tapped. It Battlecry skill don't works.
 -- Nomadess	Capture:	Choose one Henchman on your Base. Move its to this Territory. It Capture skill don't works.
--- 
+--
 -- Gentz
 -- Germont «Young Baron»	Battlecry:	Choose in your hand and remove from the game 3 cards or less. Choose on your Base equal number of different Henchmen. Play they Battlecry skills.
 -- Temptress	Battlecry:	Choose from OPEN_MERCS any one Merc Henchman and put it on your Base untapped. It Battlecry skill don't works. Tap Temptress.
 -- Bodyguard	Capture:	Choose one Henchman in your hand. Put it on your Base untapped. It Battlecry skill don't works. Trash Bodyguard.
 -- Smartass	Capture:	Choose any one Henchman on your Base. Play it Battlecry skill.
--- 
+--
 -- Patrolz
 -- Carl «Bookkeeper»	Battlecry:	Choose in your hand and remove from the game 3 cards or less. Remove from the game double number of Swag tokens on any Territories in any combination.
 -- Devastator	Battlecry:	Choose any Territory. Remove from the game a Swag token from it. Beat tapped Henchman from it.
 -- Sapper	Capture:	Remove from the game a Swag token from this Territory.
 -- Gambit	Capture:	Choose two different Territories. Move a Swag token from one to another. Beat Gambit untapped.
--- 
+--
 -- Slaverz
 -- Leo «Kind Daddy»	Battlecry:	Choose in your hand and remove from the game 3 cards or less. Put on your Base double number of untapped Thrall Henchmen.
 -- Teamster	Battlecry:	In this gameround power of Thrall Henchmen considered.
 -- Wardess	Capture:	Trash up to two your Henchmen on this Territory. Remove from the game equal number of Swag tokens from this Territory.
 -- Huntsman	Capture:	Put one Thrall Henchman on this Territory.
--- 
+--
 -- Gunnerz
 -- Billy «Bullet Head»	Battlecry:	Choose in your hand and remove from the game 3 cards or less. Beat tapped from the game double number of Henchmen on any Territories in any combination.
 -- Explodess	Battlecry:	Choose any one Territory. Beat one Henchman from it tapped.
 -- Flamer	Capture:	Trash all your Henchmans from this Territory. Remove from the game this Territory and all Swag tokens on it.
 -- Looter	Capture:	Take Swag token from this Territory immediately. Beat Looter tapped.
--- 
+--
 -- Chemz
 -- Angelina «Pure Blood»	Battlecry:	Choose in your hand and remove from the game 3 cards or less. Put on your Base equal number of untapped Fanatic Henchmen.
 -- Dodger	Battlecry:	Choose any one Henchman on any Base. Trash it. Put untapped Fanatic Henchman on your Base.
 -- Patcher	Capture:	Choose on your Base tapped Henchman. Untap it. It Battlecry skill don't works.
 -- Madman	Capture:	Beat Madman tapped. Put untapped Fanatic Henchman on your Base.
--- 
+--
 -- Mercz
 -- Grasper	Battlecry:	Choose any Territory. Take a Swag token from it.
 -- Guitarist	Battlecry:	Beat up to two your Henchmen untapped from one or different Territories.
@@ -655,6 +689,6 @@ main = undefined
 -- BlackWidow	Battlecry:	Each opponent choose one untapped Henchman from his Base and trash it.
 -- Striker	Battlecry:	Choose any Territory. Remove from the game two Swag tokens from it.
 -- Dealess	Battlecry:	In this gameround you cam attack twice, two different Territories. Effect do not stack.
--- 
+--
 -- Thrall	Permanent:	Power of Slave Henchman doesn't impact. Immediately remove it from the game after it return to the Territory to Base or trash it.
 -- Fanatic	Permanent:	Power of Fanatic Henchman has impact as two Henchmen. Immediately remove it from the game after capture Territory or trash it.
