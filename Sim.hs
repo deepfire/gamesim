@@ -16,11 +16,9 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnicodeSyntax #-}
 {-# LANGUAGE ViewPatterns #-}
-module Sim
-  ()
-where
+module Sim where
 
-
+import           Control.Lens          hiding (Indexed(..), Index(..))
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Internal
 import           Data.Maybe
@@ -28,187 +26,21 @@ import           Data.List
 import qualified Data.Set              as S
 import qualified Data.Map.Lazy         as M
 import           Prelude.Unicode
-import           System.Random.Shuffle as Sys
-import           System.IO.Unsafe      as Sys
+
+import Utils
+import SimData
 
 
--- * Generic utils
-
-remove_duplicates ∷ Ord a ⇒ [a] → [a]
-remove_duplicates = S.toList . S.fromList
-
-shuffle_list ∷ [a] → [a]
-shuffle_list = Sys.unsafePerformIO ∘ Sys.shuffleM
-
-move_cards ∷ Int → [a] → [a] → ([a], [a])
-move_cards n from to
-  = let new_from = drop n from
-        new_to   = take n from ++ to
-    in (from, to)
-
-split_by ∷ Int → (a → Bool) → [a] → ([a], [a])
-split_by n f xs = _split_by n f xs ([], [])
-  where _split_by 0 f xs     (acct, accf) = (acct, accf ++ xs)
-        _split_by n f []     (acct, accf) = (acct, accf)
-        _split_by n f (x:xs) (acct, accf) = _split_by (n - 1) f xs
-                                            $ if f x
-                                              then (x:acct,   accf)
-                                              else (  acct, x:accf)
-
-
--- * Atomic types
-
-data IPlayer
-  =  First
-  |  Second
-  |  Third
-  |  Fourth
-  deriving (Enum, Eq, Ord, Show)
-
-data IResource
-  =  Water
-  |  Drugs
-  |  Gas
-  |  Ammo
-  |  Scrap
-  |  Services
-  deriving (Enum, Eq, Ord, Show)
-
-data IGang
-  =  Valkiry
-  |  Gents
-  |  Patrol
-  |  Slavers
-  |  Gunners
-  |  Chemists
-  deriving (Enum, Eq, Ord, Show)
-
-data IMerc
-  =  Grasper
-  |  Guitarist
-  |  Madcap
-  |  Prothrall
-  |  Bonecrusher
-  |  Preacher
-  |  Drummer
-  |  Bounder
-  |  Barkeeper
-  |  BlackWidow
-  |  Striker
-  |  Dealess
-  deriving (Enum, Eq, Ord, Show)
-
-data family IGangman (igang ∷ IGang) ∷ *
+-- * Composite types
 
 data WGangman where
   WGangman ∷ (Show (IGangman gang)) ⇒ {
     wga_ix         ∷ IGangman gang
   , wga_deck_count ∷ Int
-  , wga_battelcry  ∷ BattleCry
+  , wga_battlecry  ∷ BattleCry
   , wga_capture    ∷ Capture
   } → WGangman
 deriving instance Show WGangman
-
-data instance IGangman Valkiry
-  =  ValkLead
-  |  Valk1
-  |  Valk2
-  |  Valk3
-  deriving (Enum, Eq, Ord, Show)
-
-data instance IGangman Gents
-  =  GentLead
-  |  Gent1
-  |  Gent2
-  |  Gent3
-  deriving (Enum, Eq, Ord, Show)
-
-data instance IGangman Patrol
-  =  PatrolLead
-  |  Patrol1
-  |  Patrol2
-  |  Patrol3
-  deriving (Enum, Eq, Ord, Show)
-
-data instance IGangman Slavers
-  =  SlaverLead
-  |  Slaver1
-  |  Slaver2
-  |  Slaver3
-  deriving (Enum, Eq, Ord, Show)
-
-data instance IGangman Gunners
-  =  GunnerLead
-  |  Gunner1
-  |  Gunner2
-  |  Gunner3
-  deriving (Enum, Eq, Ord, Show)
-
-data instance IGangman Chemists
-  =  ChemistLead
-  |  Chemist1
-  |  Chemist2
-  |  Chemist3
-  deriving (Enum, Eq, Ord, Show)
-
-data IHench
-  =  Gangman
-  |  Merc
-  |  Fanatic
-  |  Slave
-  deriving (Eq, Ord, Show)
-
-data ITerritory
-  =  ForbiddenRiver
-  |  CitadelOfFlayedOne
-  |  ChurchRevelationOfTheProphet
-  |  ClinicEternalLife
-  |  OilPumpOfHottyFred
-  |  RainbowLake
-  |  BulletFarm
-  |  ArmoryOfMagniKrugger
-  |  IronTown
-  |  SmelteryOfHragBakster
-  |  ShiningBurialGrounds
-  |  FactoryMechanicalMessiah
-  |  BarTheLastDrop
-  |  BrothelKittiesOfTheMaster
-  |  FightingPitBloodAndConcrete
-  |  CasinoStElmosFires
-  deriving (Eq, Ord, Show)
-
-newtype Attack       = Attack       Int           deriving (Eq, Num, Show)
-newtype Defence      = Defence      Int           deriving (Eq, Num, Show)
-newtype Swag         = Swag         Int           deriving (Eq, Num, Show)
-newtype AtSizes      = AtSizes      [Int]         deriving (         Show)
-newtype EnablesMercs = EnablesMercs [IMerc]       deriving (         Show)
-newtype GangDeck     = GangDeck     [WGangman]    deriving (         Show)
-newtype PlayerDeck   = PlayerDeck   [WGangman]    deriving (         Show)
-newtype PlayerBase   = PlayerBase   [WHench]      deriving (         Show)
-newtype PlayerHand   = PlayerHand   [WHench]      deriving (         Show)
-newtype TerrsInPlay  = TerrsInPlay  [ITerritory]  deriving (         Show)
-newtype TerrDeck     = TerrDeck     [ITerritory]  deriving (         Show)
-newtype MercsInPlay  = MercsInPlay  [IMerc]       deriving (         Show)
-newtype MercDeck     = MercDeck     [IMerc]       deriving (         Show)
-newtype Sitting      = Sitting      [IGang]       deriving (         Show)
-
-type family Index a where
-  Index Player    = IPlayer
-  Index Territory = ITerritory
-  Index Hench     = IHench
-
-class (Show (Index a)) ⇒ Indexed a where
-  index          ∷ a → Index a
-
-
--- * Composite types
-
-data WHench where
-  CMerc     ∷ IMerc → WHench
-  CGangman  ∷ WGangman → WHench
-  CFanatic  ∷ WHench
-  CSlave    ∷ WHench
-deriving instance Show WHench
 
 proof = WGangman Chemist1
 
@@ -220,32 +52,17 @@ data Capture
   =  Capture [Action ()] | NoCapture
   deriving Show
 
-
--- * Game data
+data WHench where
+  CMerc     ∷ IMerc → WHench
+  CGangman  ∷ WGangman → WHench
+  CFanatic  ∷ WHench
+  CSlave    ∷ WHench
+deriving instance Show WHench
 
-game_henchmen
-  = [ (Gangman,   (Attack 1,  Defence 1))
-    , (Merc,      (Attack 1,  Defence 1))
-    , (Fanatic,   (Attack 2,  Defence 0))
-    , (Slave,     (Attack 0,  Defence 1)) ]
-
-game_territories
-  = [ (ForbiddenRiver,                 (Water,     Swag 5,   AtSizes [2, 3, 4]))
-    , (CitadelOfFlayedOne,             (Water,     Swag 5,   AtSizes [   3, 4]))
-    , (ChurchRevelationOfTheProphet,   (Drugs,     Swag 5,   AtSizes [2,    4]))
-    , (ClinicEternalLife,              (Drugs,     Swag 5,   AtSizes [      4]))
-    , (OilPumpOfHottyFred,             (Gas,       Swag 5,   AtSizes [2, 3, 4]))
-    , (RainbowLake,                    (Gas,       Swag 5,   AtSizes [   3, 4]))
-    , (BulletFarm,                     (Ammo,      Swag 5,   AtSizes [2, 3, 4]))
-    , (ArmoryOfMagniKrugger,           (Ammo,      Swag 5,   AtSizes [   3, 4]))
-    , (IronTown,                       (Scrap,     Swag 4,   AtSizes [2, 3, 4]))
-    , (SmelteryOfHragBakster,          (Scrap,     Swag 4,   AtSizes [2, 3, 4]))
-    , (ShiningBurialGrounds,           (Scrap,     Swag 4,   AtSizes [   3, 4]))
-    , (FactoryMechanicalMessiah,       (Scrap,     Swag 4,   AtSizes [      4]))
-    , (BarTheLastDrop,                 (Services,  Swag 4,   AtSizes [2, 3, 4]))
-    , (BrothelKittiesOfTheMaster,      (Services,  Swag 4,   AtSizes [2, 3, 4]))
-    , (FightingPitBloodAndConcrete,    (Services,  Swag 4,   AtSizes [   3, 4]))
-    , (CasinoStElmosFires,             (Services,  Swag 4,   AtSizes [      4])) ]
+newtype GangDeck     = GangDeck     [WGangman]    deriving (         Show)
+newtype PlayerDeck   = PlayerDeck   [WGangman]    deriving (         Show)
+newtype PlayerBase   = PlayerBase   [WHench]      deriving (         Show)
+newtype PlayerHand   = PlayerHand   [WHench]      deriving (         Show)
 
 game_gangs
   = [ (Valkiry,   (EnablesMercs [Grasper,    Guitarist],
@@ -350,6 +167,14 @@ igang_enables_mercs = fst ∘ (M.fromList game_gangs M.!)
 
 
 -- * Active objects
+
+type family Index a where
+  Index Player    = IPlayer
+  Index Territory = ITerritory
+  Index Hench     = IHench
+
+class (Show (Index a)) ⇒ Indexed a where
+  index          ∷ a → Index a
 
 instance Indexed Hench     where
   index                    = he_ix
@@ -456,9 +281,9 @@ runAction gs m = loop gs m where
                                      , fi_mercsinplay = nmi } })
                  (nmd, nmi)
 
-          InitialDeckBaseHand iplayer base_size →
+          InitialDeckHandBase iplayer base_size →
             let idx              = fromEnum iplayer
-                Player _ igang _ _ _ _ _ =
+                p@(Player _ igang _ _ _ _ _) =
                                    players !! idx -- XXX: non-total
                 GangDeck gangmen = igang_deck igang
                 wgang_has_capture (WGangman _ _ _ capture) | NoCapture ← capture = False
@@ -466,11 +291,11 @@ runAction gs m = loop gs m where
                 shuffled         = shuffle_list gangmen
                 (basecs, restcs) = split_by base_size wgang_has_capture gangmen
                 (deckcs, handcs) = splitAt 4 restcs
-                deck             = PlayerDeck $ deckcs
-                base             = PlayerBase $ fmap CGangman basecs
-                hand             = PlayerHand $ fmap CGangman handcs
-            in k (gs { gs_players =  })
-                 (nmd, nmi)
+                deck             = fmap wga_ix deckcs
+                hand             = fmap CGangman handcs
+                base             = fmap CGangman basecs
+            in k (gs { gs_players = players & element idx .~ p { pl_deck = deck, pl_base = base, pl_hand = hand } } )
+                 (deck, hand, base)
 
 -- complete_action x@(PlayerSitting gangs _)
 --   = x { sitting = Sitting $ shuffle_list gangs }
@@ -507,10 +332,10 @@ data Action s where
   PlayerSitting ∷
     { sitting             ∷ Sitting }
     → Action ()
-  InitialDeckBaseHand ∷
+  InitialDeckHandBase ∷
     { player              ∷ IPlayer
     , base_size           ∷ Int }
-    → Action (PlayerDeck, PlayerBase, PlayerHand)
+    → Action (PlayerDeck, PlayerHand, PlayerBase)
 deriving instance Show (Action a)
 
 next_phase ∷ GameState → Phase → Phase

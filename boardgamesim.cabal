@@ -57,6 +57,7 @@ executable sim
                      , containers >=0.5
                      , freer >= 0.2.0.0
                      , hashable >= 1.2.3.3
+                     , lens
                      , optparse-applicative
                      , optparse-generic
                      , random-shuffle
