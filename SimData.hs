@@ -61,51 +61,34 @@ data IMerc
   |  Dealess
   deriving (Enum, Eq, Ord, Show)
 
-data family IGangman (igang ∷ IGang) ∷ *
-
-data instance IGangman Valkiry
+data IGangman
   =  ValkLead
   |  Valk1
   |  Valk2
   |  Valk3
-  deriving (Enum, Eq, Ord, Show)
-
-data instance IGangman Gents
-  =  GentLead
+  |  GentLead
   |  Gent1
   |  Gent2
   |  Gent3
-  deriving (Enum, Eq, Ord, Show)
-
-data instance IGangman Patrol
-  =  PatrolLead
+  |  PatrolLead
   |  Patrol1
   |  Patrol2
   |  Patrol3
-  deriving (Enum, Eq, Ord, Show)
-
-data instance IGangman Slavers
-  =  SlaverLead
+  |  SlaverLead
   |  Slaver1
   |  Slaver2
   |  Slaver3
-  deriving (Enum, Eq, Ord, Show)
-
-data instance IGangman Gunners
-  =  GunnerLead
+  |  GunnerLead
   |  Gunner1
   |  Gunner2
   |  Gunner3
-  deriving (Enum, Eq, Ord, Show)
-
-data instance IGangman Chemists
-  =  ChemistLead
+  |  ChemistLead
   |  Chemist1
   |  Chemist2
   |  Chemist3
   deriving (Enum, Eq, Ord, Show)
 
-data IHench
+data IHenchmanType
   =  Gangman
   |  Merc
   |  Fanatic

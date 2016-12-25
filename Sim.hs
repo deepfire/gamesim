@@ -10,6 +10,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
@@ -19,226 +20,23 @@
 module Sim where
 
 import           Control.Lens          hiding (Indexed(..), Index(..))
+import           Control.Lens.TH
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Internal
 import           Data.Maybe
 import           Data.List
 import qualified Data.Set              as S
-import qualified Data.Map.Lazy         as M
 import           Prelude.Unicode
 
 import Utils
 import SimData
-
-
--- * Composite types
-
-data WGangman where
-  WGangman ∷ (Show (IGangman gang)) ⇒ {
-    wga_ix         ∷ IGangman gang
-  , wga_deck_count ∷ Int
-  , wga_battlecry  ∷ BattleCry
-  , wga_capture    ∷ Capture
-  } → WGangman
-deriving instance Show WGangman
-
-proof = WGangman Chemist1
-
-data BattleCry
-  =  BattleCry [Action ()] | NoBattleCry
-  deriving Show
-
-data Capture
-  =  Capture [Action ()] | NoCapture
-  deriving Show
-
-data WHench where
-  CMerc     ∷ IMerc → WHench
-  CGangman  ∷ WGangman → WHench
-  CFanatic  ∷ WHench
-  CSlave    ∷ WHench
-deriving instance Show WHench
-
-newtype GangDeck     = GangDeck     [WGangman]    deriving (         Show)
-newtype PlayerDeck   = PlayerDeck   [WGangman]    deriving (         Show)
-newtype PlayerBase   = PlayerBase   [WHench]      deriving (         Show)
-newtype PlayerHand   = PlayerHand   [WHench]      deriving (         Show)
-
-game_gangs
-  = [ (Valkiry,   (EnablesMercs [Grasper,    Guitarist],
-                   GangDeck [ WGangman ValkLead    1
-                               NoBattleCry
-                               NoCapture
-                            , WGangman Valk1       3
-                               NoBattleCry
-                               NoCapture
-                            , WGangman Valk2       3
-                               NoBattleCry
-                               NoCapture
-                            , WGangman Valk3       3
-                               NoBattleCry
-                               NoCapture ]))
-    , (Gents,     (EnablesMercs [Madcap,   Prothrall],
-                   GangDeck [ WGangman GentLead    1
-                               NoBattleCry
-                               NoCapture
-                            , WGangman Gent1       3
-                               NoBattleCry
-                               NoCapture
-                            , WGangman Gent2       3
-                               NoBattleCry
-                               NoCapture
-                            , WGangman Gent3       3
-                               NoBattleCry
-                               NoCapture ]))
-    , (Patrol,    (EnablesMercs [Bonecrusher,    Preacher],
-                   GangDeck [ WGangman PatrolLead  1
-                               NoBattleCry
-                               NoCapture
-                            , WGangman Patrol1     3
-                               NoBattleCry
-                               NoCapture
-                            , WGangman Patrol2     3
-                               NoBattleCry
-                               NoCapture
-                            , WGangman Patrol3     3
-                               NoBattleCry
-                               NoCapture ]))
-    , (Slavers,   (EnablesMercs [Drummer, Bounder],
-                   GangDeck [ WGangman SlaverLead  1
-                               NoBattleCry
-                               NoCapture
-                            , WGangman Slaver1     3
-                               NoBattleCry
-                               NoCapture
-                            , WGangman Slaver2     3
-                               NoBattleCry
-                               NoCapture
-                            , WGangman Slaver3     3
-                               NoBattleCry
-                               NoCapture ]))
-    , (Gunners,   (EnablesMercs [Barkeeper,     BlackWidow],
-                   GangDeck [ WGangman GunnerLead  1
-                               NoBattleCry
-                               NoCapture
-                            , WGangman Gunner1     3
-                               NoBattleCry
-                               NoCapture
-                            , WGangman Gunner2     3
-                               NoBattleCry
-                               NoCapture
-                            , WGangman Gunner3     3
-                               NoBattleCry
-                               NoCapture ]))
-    , (Chemists,  (EnablesMercs [Striker,  Dealess],
-                   GangDeck [ WGangman ChemistLead 1
-                               NoBattleCry
-                               NoCapture
-                            , WGangman Chemist1    3
-                               NoBattleCry
-                               NoCapture
-                            , WGangman Chemist2    3
-                               NoBattleCry
-                               NoCapture
-                            , WGangman Chemist3    3
-                               NoBattleCry
-                               NoCapture ])) ]
-
-
--- * Game data queries
-
-ihench_attack    ∷ IHench → Attack
-ihench_attack    = fst ∘ (M.fromList game_henchmen M.!)
-
-ihench_defence   ∷ IHench → Defence
-ihench_defence   = snd ∘ (M.fromList game_henchmen M.!)
-
-iterr_resource   ∷ ITerritory → IResource
-iterr_resource   = (\(x, _, _) → x) ∘ (M.fromList game_territories M.!)
-
-iterr_init_swag  ∷ ITerritory → Swag
-iterr_init_swag  = (\(_, x, _) → x) ∘ (M.fromList game_territories M.!)
-
-igang_deck       ∷ IGang → GangDeck
-igang_deck       = snd ∘ (M.fromList game_gangs M.!)
-
-igang_enables_mercs ∷ IGang → EnablesMercs
-igang_enables_mercs = fst ∘ (M.fromList game_gangs M.!)
-
-
--- * Active objects
-
-type family Index a where
-  Index Player    = IPlayer
-  Index Territory = ITerritory
-  Index Hench     = IHench
-
-class (Show (Index a)) ⇒ Indexed a where
-  index          ∷ a → Index a
-
-instance Indexed Hench     where
-  index                    = he_ix
-
-instance Indexed Territory where
-  index                    = te_ix
-
-instance Indexed Player    where
-  index                    = pl_ix
-
-data Hench
-  =  Hench {
-      he_ix           ∷ IHench
-    , he_whench       ∷ WHench
-    , he_untapped     ∷ Bool
-    }
-  deriving (Show)
-
-data Territory
-  =  Territory {
-      te_ix           ∷ ITerritory
-    , te_swag         ∷ Swag
-    , te_owner        ∷ Maybe IGang
-    , te_henchmen     ∷ [Hench]
-    }
-  deriving (Show)
-
-data Player
-  =  Player {
-      pl_ix           ∷ IPlayer
-    , pl_gang         ∷ IGang
-    , pl_deck         ∷ [IHench]    -- Visibility: noone;    only mercs and gangmen
-    , pl_hand         ∷ [IHench]    -- Visibility: player;   only mercs and gangmen
-    , pl_base         ∷ [Hench]     -- Visibility: everyone; everyone
-    , pl_terrs        ∷ [ITerritory]
-    , pl_swag         ∷ Swag
-    }
-  deriving (Show)
-
-data Field
-  =  Field {
-      fi_terrsinplay  ∷ TerrsInPlay  -- 1 to 4
-    , fi_mercsinplay  ∷ MercsInPlay  -- mercs only
-    , fi_terrdeck     ∷ TerrDeck
-    , fi_mercdeck     ∷ MercDeck     -- mercs only
-    }
-  deriving (Show)
-
-data GameState
-  =  GameState {
-      gs_field        ∷ Field
-    , gs_players      ∷ [Player]
-    , gs_current      ∷ IPlayer
-    }
-  deriving (Show)
-
-data Squad
-  =  Squad {
-      sq_targets      ∷ [(Territory, IHench)]
-    }
-  deriving (Show)
+import SimRules
 
 
 -- * Actions
+
+dealGangman ∷ IGangman → Henchman
+dealGangman = (flip Henchman) False ∘ IGangman
 
 runAction ∷ GameState → Eff '[Action] w → Eff '[] w
 runAction gs m = loop gs m where
@@ -256,46 +54,46 @@ runAction gs m = loop gs m where
             k gs gs
 
           EnterPlayers gangs →
-            let players = [ Player { pl_gang = g } | g ← gangs ]
-            in k (gs { gs_players = players }) players
+            let players = [ Player { _pl_gang = g } | g ← gangs ]
+            in k (gs { _gs_players = players }) players
 
           InitialTerrDeck →
             let game_size = length players
                 terrdeck  = TerrDeck ∘ map fst ∘ (flip filter) game_territories $
                             \(iterr, (_, _, AtSizes allowed_sizes)) → game_size ∈ allowed_sizes
-            in k (gs { gs_field = fi { fi_terrdeck = terrdeck } }) terrdeck
+            in k (gs { _gs_field = fi { _fi_terrdeck = terrdeck } }) terrdeck
 
           InitialMercDeck merc_multiplier →
-            let gangs     = fmap pl_gang players
+            let gangs     = fmap _pl_gang players
                 mercdeck  = MercDeck ∘ shuffle_list ∘ (flip foldMap) game_gangs $
                             \(igang, (EnablesMercs imercs, _))
                             → if igang ∈ gangs
                               then foldl (++) [] $ take merc_multiplier $ repeat imercs
                               else []
-            in k (gs { gs_field = fi { fi_mercdeck = mercdeck } }) mercdeck
+            in k (gs { _gs_field = fi { _fi_mercdeck = mercdeck } }) mercdeck
 
           MoveMercsIntoPlay nmercs →
-            let (new_mdcards, new_micards) = move_cards nmercs mdcards micards
+            let (new_mdcards, new_micards) = move_list_head nmercs mdcards micards
                 (nmd, nmi)                 = (MercDeck new_mdcards, MercsInPlay new_micards)
-            in k (gs { gs_field = fi { fi_mercdeck    = nmd
-                                     , fi_mercsinplay = nmi } })
+            in k (gs { _gs_field = fi { _fi_mercdeck    = nmd
+                                      , _fi_mercsinplay = nmi } })
                  (nmd, nmi)
 
           InitialDeckHandBase iplayer base_size →
             let idx              = fromEnum iplayer
                 p@(Player _ igang _ _ _ _ _) =
                                    players !! idx -- XXX: non-total
-                GangDeck gangmen = igang_deck igang
-                wgang_has_capture (WGangman _ _ _ capture) | NoCapture ← capture = False
-                                                           | Capture _ ← capture = True
-                shuffled         = shuffle_list gangmen
-                (basecs, restcs) = split_by base_size wgang_has_capture gangmen
+                GangDeck gangixs = igang_deck igang
+                dg_has_capture (DGangman _ _ _ capture) | NoCapture ← capture = False
+                                                        | Capture _ ← capture = True
+                shuffled         = shuffle_list gangixs
+                (basecs, restcs) = split_by base_size (dg_has_capture ∘ gangman_desc) shuffled ∷ ([IGangman], [IGangman])
                 (deckcs, handcs) = splitAt 4 restcs
-                deck             = fmap wga_ix deckcs
-                hand             = fmap CGangman handcs
-                base             = fmap CGangman basecs
-            in k (gs { gs_players = players & element idx .~ p { pl_deck = deck, pl_base = base, pl_hand = hand } } )
-                 (deck, hand, base)
+                deck             = deckcs
+                hand             = fmap IGangman handcs
+                base             = fmap dealGangman basecs ∷ [Henchman]
+            in k (gs { _gs_players = players & element idx .~ p { _pl_deck = deck, _pl_base = base, _pl_hand = hand } } )
+                 (PlayerDeck deck, PlayerHand hand, PlayerBase base)
 
 -- complete_action x@(PlayerSitting gangs _)
 --   = x { sitting = Sitting $ shuffle_list gangs }
@@ -314,29 +112,6 @@ game ∷ GameState
 game = runGameState (GameState {}) $ do
   send $ EnterPlayers [Valkiry]
   send DumpState
-
-data Action s where
-  DumpState ∷
-      Action GameState
-  EnterPlayers ∷
-    { player_gangs        ∷ [IGang] }
-    → Action [Player]
-  InitialTerrDeck ∷
-      Action TerrDeck
-  InitialMercDeck ∷
-    { merc_multiplier     ∷ Int }
-    → Action MercDeck
-  MoveMercsIntoPlay ∷
-    { merc_count          ∷ Int }
-    → Action (MercDeck, MercsInPlay)
-  PlayerSitting ∷
-    { sitting             ∷ Sitting }
-    → Action ()
-  InitialDeckHandBase ∷
-    { player              ∷ IPlayer
-    , base_size           ∷ Int }
-    → Action (PlayerDeck, PlayerHand, PlayerBase)
-deriving instance Show (Action a)
 
 next_phase ∷ GameState → Phase → Phase
 next_phase (GameState (Field (TerrsInPlay cur_terr) (MercsInPlay cur_merc)
