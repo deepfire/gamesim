@@ -5,7 +5,7 @@ let
   inherit (nixpkgs) pkgs;
 
   f = { mkDerivation, base, base-unicode-symbols, bytestring
-      , cassava, containers, hashable, intero, optparse-applicative
+      , cassava, containers, extra, hashable, intero, optparse-applicative
       , optparse-generic, random-shuffle, stdenv, text, unordered-containers
       , freer, lens
       }:
@@ -16,7 +16,7 @@ let
         isLibrary = false;
         isExecutable = true;
         executableHaskellDepends = [
-          base base-unicode-symbols bytestring cassava containers hashable
+          base base-unicode-symbols bytestring cassava containers extra hashable
           intero optparse-applicative optparse-generic random-shuffle text
           unordered-containers
 	  freer lens
