@@ -10,7 +10,7 @@ let
       , freer, lens
       }:
       mkDerivation {
-        pname = "boardgamesim";
+        pname = "gamesim";
         version = "0.0.1";
         src = ./.;
         isLibrary = false;

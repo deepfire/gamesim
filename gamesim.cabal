@@ -2,7 +2,7 @@
 -- see http://haskell.org/cabal/users-guide/
 
 -- The name of the package.
-name:                boardgamesim
+name:                gamesim
 
 -- The package version.  See the Haskell package versioning policy (PVP) 
 -- for standards guiding when and how versions should be incremented.
@@ -55,6 +55,7 @@ executable sim
                      , bytestring
                      , cassava
                      , containers >=0.5
+                     , extra
                      , freer >= 0.2.0.0
                      , hashable >= 1.2.3.3
                      , lens
