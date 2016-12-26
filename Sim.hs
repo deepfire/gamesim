@@ -6,6 +6,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
@@ -55,13 +56,13 @@ runAction gs m = loop gs m where
 
           EnterPlayers gangs →
             let players = [ Player { _pl_gang = g } | g ← gangs ]
-            in k (gs { _gs_players = players }) players
+            in k (gs & gs_players .~ players) players
 
           InitialTerrDeck →
             let game_size = length players
                 terrdeck  = TerrDeck ∘ map fst ∘ (flip filter) game_territories $
                             \(iterr, (_, _, AtSizes allowed_sizes)) → game_size ∈ allowed_sizes
-            in k (gs { _gs_field = fi { _fi_terrdeck = terrdeck } }) terrdeck
+            in k (gs & gs_field.fi_terrdeck .~ terrdeck) terrdeck
 
           InitialMercDeck merc_multiplier →
             let gangs     = fmap _pl_gang players
@@ -70,19 +71,19 @@ runAction gs m = loop gs m where
                             → if igang ∈ gangs
                               then foldl (++) [] $ take merc_multiplier $ repeat imercs
                               else []
-            in k (gs { _gs_field = fi { _fi_mercdeck = mercdeck } }) mercdeck
+            in k (gs & gs_field.fi_mercdeck .~ mercdeck) mercdeck
 
           MoveMercsIntoPlay nmercs →
             let (new_mdcards, new_micards) = move_list_head nmercs mdcards micards
-                (nmd, nmi)                 = (MercDeck new_mdcards, MercsInPlay new_micards)
-            in k (gs { _gs_field = fi { _fi_mercdeck    = nmd
-                                      , _fi_mercsinplay = nmi } })
-                 (nmd, nmi)
+                (new_md,      new_mi)      = (MercDeck new_mdcards, MercsInPlay new_micards)
+            in k (gs & gs_field.fi_mercdeck    .~ new_md
+                     & gs_field.fi_mercsinplay .~ new_mi)
+                 (new_md, new_mi)
 
           InitialDeckHandBase iplayer base_size →
             let idx              = fromEnum iplayer
-                p@(Player _ igang _ _ _ _ _) =
-                                   players !! idx -- XXX: non-total
+                plens            = unsafeSingular $ gs_players.element idx -- XXX: non-total
+                p@(Player _ igang _ _ _ _ _) = gs ^. plens
                 GangDeck gangixs = igang_deck igang
                 dg_has_capture (DGangman _ _ _ capture) | NoCapture ← capture = False
                                                         | Capture _ ← capture = True
@@ -92,7 +93,7 @@ runAction gs m = loop gs m where
                 deck             = deckcs
                 hand             = fmap IGangman handcs
                 base             = fmap dealGangman basecs ∷ [Henchman]
-            in k (gs { _gs_players = players & element idx .~ p { _pl_deck = deck, _pl_base = base, _pl_hand = hand } } )
+            in k (gs & plens .~ p { _pl_deck = deck, _pl_base = base, _pl_hand = hand })
                  (PlayerDeck deck, PlayerHand hand, PlayerBase base)
 
 -- complete_action x@(PlayerSitting gangs _)
