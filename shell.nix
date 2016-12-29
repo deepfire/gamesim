@@ -5,9 +5,10 @@ let
   inherit (nixpkgs) pkgs;
 
   f = { mkDerivation, base, base-unicode-symbols, bytestring
-      , cassava, containers, extra, hashable, intero, optparse-applicative
+      , containers, extra, hashable, optparse-applicative
       , optparse-generic, random-shuffle, stdenv, text, unordered-containers
-      , freer, lens
+      , freer, lens, MissingK
+      , stack, intero, nix
       }:
       mkDerivation {
         pname = "gamesim";
@@ -16,10 +17,11 @@ let
         isLibrary = false;
         isExecutable = true;
         executableHaskellDepends = [
-          base base-unicode-symbols bytestring cassava containers extra hashable
-          intero optparse-applicative optparse-generic random-shuffle text
+          base base-unicode-symbols bytestring containers extra hashable
+          optparse-applicative optparse-generic random-shuffle text
           unordered-containers
-	  freer lens
+	  freer lens MissingK
+	  stack intero nix
         ];
         description = "Game simulator";
         license = stdenv.lib.licenses.agpl3;

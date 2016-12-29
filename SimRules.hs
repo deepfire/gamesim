@@ -57,6 +57,11 @@ data IHenchman where
 deriving instance Show IHenchman
 
 newtype GangDeck     = GangDeck     [IGangman]    deriving (Show)
+newtype TerrsInPlay  = TerrsInPlay  [Territory]   deriving (Show)
+newtype TerrDeck     = TerrDeck     [ITerritory]  deriving (Show)
+newtype MercsInPlay  = MercsInPlay  [IMerc]       deriving (Show)
+newtype MercDeck     = MercDeck     [IMerc]       deriving (Show)
+newtype Sitting      = Sitting      [IGang]       deriving (Show)
 newtype PlayerDeck   = PlayerDeck   [IGangman]    deriving (Show)
 newtype PlayerBase   = PlayerBase   [Henchman]    deriving (Show)
 newtype PlayerHand   = PlayerHand   [IHenchman]   deriving (Show)
@@ -197,6 +202,10 @@ data Territory
     }
   deriving (Show)
 
+activate_territory ∷ ITerritory → Territory
+activate_territory ix
+  = Territory ix (iterr_init_swag ix) Nothing []
+
 data Player
   =  Player {
       _pl_ix           ∷ IPlayer
@@ -246,7 +255,7 @@ data Action s where
   InitialMercDeck ∷
     { merc_multiplier     ∷ Int }
     → Action MercDeck
-  MoveMercsIntoPlay ∷
+  PutMercsIntoPlay ∷
     { merc_count          ∷ Int }
     → Action (MercDeck, MercsInPlay)
   PlayerSitting ∷
@@ -256,7 +265,24 @@ data Action s where
     { player              ∷ IPlayer
     , base_size           ∷ Int }
     → Action (PlayerDeck, PlayerHand, PlayerBase)
+  PutTerrsIntoPlay ∷
+    { nterrs              ∷ Int }
+    → Action (TerrDeck, TerrsInPlay)
+  QueryOpenTerritories ∷
+    Action Bool
+  QueryClosedTerritories ∷
+    Action Bool
+  DrawMerc ∷
+    { player'             ∷ IPlayer
+    , n                   ∷ Int }
+    → Action IMerc
+  PlayHand ∷
+    { player''            ∷ IPlayer
+    , n'                  ∷ Int }
+    → Action IHenchman
 deriving instance Show (Action a)
+
+data Score
 
 
 -- * The impassable TH barrier: nothing crosses from above or below..

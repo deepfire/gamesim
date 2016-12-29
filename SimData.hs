@@ -119,11 +119,6 @@ newtype Defence      = Defence      Int           deriving (Eq, Num, Show)
 newtype Swag         = Swag         Int           deriving (Eq, Num, Show)
 newtype AtSizes      = AtSizes      [Int]         deriving (         Show)
 newtype EnablesMercs = EnablesMercs [IMerc]       deriving (         Show)
-newtype TerrsInPlay  = TerrsInPlay  [ITerritory]  deriving (         Show)
-newtype TerrDeck     = TerrDeck     [ITerritory]  deriving (         Show)
-newtype MercsInPlay  = MercsInPlay  [IMerc]       deriving (         Show)
-newtype MercDeck     = MercDeck     [IMerc]       deriving (         Show)
-newtype Sitting      = Sitting      [IGang]       deriving (         Show)
 
 
 -- * Game data

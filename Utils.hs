@@ -18,7 +18,10 @@
 {-# LANGUAGE ViewPatterns #-}
 module Utils where
 
+import           Control.Lens
 import qualified Data.Set              as S
+import           Data.Maybe
+import           Data.Tuple.Extra
 import           Prelude.Unicode
 import           System.Random.Shuffle as Sys
 import           System.IO.Unsafe      as Sys
@@ -46,3 +49,9 @@ split_by n f xs = _split_by n f xs ([], [])
                                             $ if f x
                                               then (x:acct,   accf)
                                               else (  acct, x:accf)
+
+mxtract ∷ Int → [a] → Maybe (a, [a])
+mxtract = loop []
+  where
+    loop acc 0 = fmap (second (reverse acc ++)) ∘ uncons
+    loop acc n = \(x:xs) → loop (x:acc) (n - 1) xs

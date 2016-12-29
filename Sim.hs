@@ -9,6 +9,7 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PackageImports #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -22,10 +23,14 @@ module Sim where
 
 import           Control.Lens          hiding (Indexed(..), Index(..))
 import           Control.Lens.TH
+import           Control.Monad
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Internal
 import           Data.Maybe
+import qualified Data.Map.Lazy         as M
 import           Data.List
+import           Data.List.Lens
+import "MissingK" Data.List.Extra
 import qualified Data.Set              as S
 import           Prelude.Unicode
 
@@ -41,6 +46,7 @@ dealGangman = (flip Henchman) False ∘ IGangman
 
 runAction ∷ GameState → Eff '[Action] w → Eff '[] w
 runAction gs m = loop gs m where
+  player ix = unsafeSingular $ gs_players.(element $ fromEnum ix) -- XXX: non-total
   loop ∷ GameState → Eff (Action ': r) w → Eff r w
   loop gs (Val x) = return x
   loop gs@(GameState fi@(Field ti@(TerrsInPlay ticards) mi@(MercsInPlay micards)
@@ -52,17 +58,19 @@ runAction gs m = loop gs m where
         case act of
 
           DumpState →
-            k gs gs
+            kombine gs gs
 
           EnterPlayers gangs →
             let players = [ Player { _pl_gang = g } | g ← gangs ]
-            in k (gs & gs_players .~ players) players
+            in kombine (gs & gs_players .~ players)
+                       players
 
           InitialTerrDeck →
             let game_size = length players
                 terrdeck  = TerrDeck ∘ map fst ∘ (flip filter) game_territories $
                             \(iterr, (_, _, AtSizes allowed_sizes)) → game_size ∈ allowed_sizes
-            in k (gs & gs_field.fi_terrdeck .~ terrdeck) terrdeck
+            in kombine (gs & gs_field.fi_terrdeck .~ terrdeck)
+                       terrdeck
 
           InitialMercDeck merc_multiplier →
             let gangs     = fmap _pl_gang players
@@ -71,30 +79,51 @@ runAction gs m = loop gs m where
                             → if igang ∈ gangs
                               then foldl (++) [] $ take merc_multiplier $ repeat imercs
                               else []
-            in k (gs & gs_field.fi_mercdeck .~ mercdeck) mercdeck
+            in kombine (gs & gs_field.fi_mercdeck .~ mercdeck)
+                       mercdeck
 
-          MoveMercsIntoPlay nmercs →
+          PutMercsIntoPlay nmercs →
             let (new_mdcards, new_micards) = move_list_head nmercs mdcards micards
                 (new_md,      new_mi)      = (MercDeck new_mdcards, MercsInPlay new_micards)
-            in k (gs & gs_field.fi_mercdeck    .~ new_md
-                     & gs_field.fi_mercsinplay .~ new_mi)
-                 (new_md, new_mi)
+            in kombine (gs & gs_field.fi_mercdeck    .~ new_md
+                           & gs_field.fi_mercsinplay .~ new_mi)
+                       (new_md, new_mi)
 
-          InitialDeckHandBase iplayer base_size →
-            let idx              = fromEnum iplayer
-                plens            = unsafeSingular $ gs_players.element idx -- XXX: non-total
-                p@(Player _ igang _ _ _ _ _) = gs ^. plens
-                GangDeck gangixs = igang_deck igang
-                dg_has_capture (DGangman _ _ _ capture) | NoCapture ← capture = False
-                                                        | Capture _ ← capture = True
+          InitialDeckHandBase plix base_size →
+            let p                = gs ^. player plix
+                GangDeck gangixs = igang_deck $ p ^. pl_gang
+                dg_has_capture (DGangman _ _ _ capture)
+                  | NoCapture ← capture = False
+                  | Capture _ ← capture = True
                 shuffled         = shuffle_list gangixs
                 (basecs, restcs) = split_by base_size (dg_has_capture ∘ gangman_desc) shuffled ∷ ([IGangman], [IGangman])
                 (deckcs, handcs) = splitAt 4 restcs
                 deck             = deckcs
                 hand             = fmap IGangman handcs
                 base             = fmap dealGangman basecs ∷ [Henchman]
-            in k (gs & plens .~ p { _pl_deck = deck, _pl_base = base, _pl_hand = hand })
-                 (PlayerDeck deck, PlayerHand hand, PlayerBase base)
+            in kombine (gs & player plix .~ p { _pl_deck = deck, _pl_base = base, _pl_hand = hand })
+                       (PlayerDeck deck, PlayerHand hand, PlayerBase base)
+
+          PutTerrsIntoPlay nterrs →
+            let (terrs, new_tdcards) = splitAt nterrs tdcards
+                new_td               = TerrDeck new_tdcards
+                new_ti               = TerrsInPlay $ activate_territory <$> terrs
+            in kombine (gs & gs_field.fi_terrdeck    .~ new_td
+                           & gs_field.fi_terrsinplay .~ new_ti)
+                       (new_td, new_ti)
+
+          DrawMerc plix cix →
+            let (tohand, restmercs) = fromJust $ mxtract cix micards
+                (tomercs, restdeck) = fromJust $ mxtract 0   mdcards
+            in kombine (gs & player plix.pl_hand     %~ (IMerc tohand:)
+                           & gs_field.fi_mercsinplay .~ MercsInPlay (tomercs : restmercs)
+                           & gs_field.fi_mercdeck    .~ MercDeck    restdeck)
+                       tohand
+
+          PlayHand plix cix →
+            let (tobase, resthand) = fromJust $ mxtract cix 
+            in kombine
+                       tobase
 
 -- complete_action x@(PlayerSitting gangs _)
 --   = x { sitting = Sitting $ shuffle_list gangs }
@@ -103,16 +132,51 @@ runAction gs m = loop gs m where
 --         in TerrDeck ∘ map fst ∘ (flip filter) game_territories $
 --             \(iterr, (_, _, AtSizes allowed_sizes)) → game_size ∈ allowed_sizes }
           
-      Left u → E u (tsingleton (k gs))
-    where k s = qComp q (loop gs)
+      Left u → E u (tsingleton (kombine gs))
+    where kombine s = qComp q (loop gs)
 
 runGameState ∷ GameState → Eff '[Action] GameState → GameState
 runGameState gs = run ∘ runAction gs
 
 game ∷ GameState
 game = runGameState (GameState {}) $ do
-  send $ EnterPlayers [Valkiry]
+  let gangs        = [Valkiry, Valkiry, Valkiry]
+      player_ixes  = toEnum <$> [1..length gangs]
+      player_order = cycle player_ixes
+  send $ EnterPlayers gangs
+  send $ InitialTerrDeck
+  send $ InitialMercDeck 4
+  send $ PutMercsIntoPlay 2
+  forM player_ixes $ do
+    \ix -> send $ InitialDeckHandBase ix 4
+  let game_days = do
+        has_closed_terrs ← send QueryClosedTerritories
+        when has_closed_terrs $ do
+          send $ PutTerrsIntoPlay $ length gangs
+          day_rounds player_order
+          game_days
+      day_rounds ∷ [IPlayer] → Eff '[Action] GameState
+      day_rounds (pix:rest) = do
+        has_open_terrs ← send QueryOpenTerritories
+        if not has_open_terrs
+        then send DumpState
+        else do
+          -- maybe send $ DrawMerc pix $randomCard
+          day_rounds rest
+  game_days
   send DumpState
+
+compute_score ∷ GameState → M.Map IPlayer Int
+compute_score = (⊥)
+  -- let max_score = max player_score players
+  --     winners   = filter (player_score = max_score) players
+  --     max_terrs = max pl_terrs winners
+  --     winners2  = filter (pl_terrs = max_terrs) winners
+  --     pl_mercs  = length (filter is_merc (pl_deck ++ pl_base ++ pl_hand))
+  --     max_mercs = max pl_mercs winners2
+  --     winners3  = filter (pl_mercs = max_mercs) winners2
+  --     winner    = max enumIndex winners3
+  --  in winner
 
 next_phase ∷ GameState → Phase → Phase
 next_phase (GameState (Field (TerrsInPlay cur_terr) (MercsInPlay cur_merc)
@@ -218,15 +282,7 @@ data Phase
 
   |  CheckGameEnd     -- repeat while (current + closed) territories left
 
-  |  ScoreCount       -- winner:
-                      --   let max_score = max player_score players
-                      --       winners   = filter (player_score = max_score) players
-                      --       max_terrs = max pl_terrs winners
-                      --       winners2  = filter (pl_terrs = max_terrs) winners
-                      --       pl_mercs  = length (filter is_merc (pl_deck ++ pl_base ++ pl_hand))
-                      --       max_mercs = max pl_mercs winners2
-                      --       winners3  = filter (pl_mercs = max_mercs) winners2
-                      --       winner    = max enumIndex winners3
+  |  ScoreCount
 
   |  GameEnd
   deriving (Enum, Eq, Ord, Show)
