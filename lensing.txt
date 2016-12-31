@@ -1,0 +1,188 @@
+01:52 <deepfire`> what is the way to have a passthrough-ish lens for things
+                  like popping from the top of a list (so that you get both the
+                  popped value and the modified list)?
+01:53 <deepfire`> in the same spirit as (<.~) :: ASetter s t a b -> b -> s ->
+                  (b, t)
+01:54 <deepfire`> ..but with a transformation
+01:54 <deepfire`> ..and an output from the transformation
+01:56 <deepfire`> (and I actually wonder if <.~ is composable wrt. deep access
+                  -- which it doesn't seem to be, judging by the type)
+01:57 <deepfire`> something that would allow threading of the "side-result"
+                  (the popped value) all the way up, without interfering with
+                  the list update
+02:09 <Gurkenglas> :t StateT uncons -- deepfire`
+02:09 <lambdabot> StateT [a] Maybe a
+02:27 <deepfire`> Gurkenglas: is there no monad-less way to do that?
+02:27 <deepfire`> it seems somewhat cumbersome for the simple functional update
+                  job ..
+02:28 <deepfire`> ..plus, I'm already within a freer monad, not within mtl, so
+                  it's an additional conceptual burden..
+02:29 <Gurkenglas> You want the type signature Lens' s [a] -> s -> (a, s)?
+02:29 <Gurkenglas> Umm, Lens' s [a] -> s -> Maybe (a, s)
+02:31 <deepfire`> Gurkenglas: ultimately -- yes, but for the /whole/ lens, not
+                  a part of it -- I need the field of s to stay :: a
+02:31 <Gurkenglas> :t alaf Compose (traverseOf ?l) uncons
+02:31 <lambdabot> (?l::LensLike (Compose Maybe ((,) a)) s a' [a] [a]) => s ->
+                  Maybe (a, a')
+02:31 <Gurkenglas> I didn't understand that last line, can you state a type
+                   signature?
+02:32 <deepfire`> Gurkenglas, if I had a single level of nesting, the type you
+                  have provided would have done in any case
+02:33 <deepfire`> Gurkenglas: but with multiple levels of nesting, the type you
+                  have provided would only serve my requirements if it applied
+                  to the /whole/ lens
+02:34 <deepfire`> the combined lens, that is
+02:34 <Gurkenglas> What do you mean by applied to the whole/combined lens?
+02:34 <deepfire`> lenses combine with (.), right?
+02:34 <Gurkenglas> compose, yes. What do you mean by applied to the composed
+                   lens?
+02:35 <deepfire`> I have no idea how to get it, but: I need the container with
+                  the unmodified type -- i.e. all of the intermediate focused
+                  fields of s retain the type
+02:36 <deepfire`> ..and at the same time, I want the "popped off" value
+02:36 <Gurkenglas> The focused fields do not change their type if you provide a
+                   Lens' s [a]
+02:37 <deepfire`> aha.. so the "pop" can yield a list
+02:37 <Gurkenglas> They might if you provide a Lens s t [a] [a], where t has
+                   those fields with types different from those in s
+02:37 <Gurkenglas> "the pop can yield a list" sounds like we're still talking
+                   about different things.
+02:37 <Gurkenglas> I'm basically a chatbot here that is at the point where it's
+                   doing that "I did not understand your question" thing
+02:39 <Gurkenglas> @let import Control.Comonad.Cofree
+02:39 <lambdabot>  Defined.
+02:39 <idnar> > alaf Compose (traverseOf (_1._2)) uncons ((42,[1,2,3]), 56)
+02:39 <lambdabot>  Just (1,((42,[2,3]),56))
+02:39 <idnar> > alaf Compose (traverseOf (_1._2)) uncons ((42,[]), 56)
+02:39 <lambdabot>  Nothing
+02:40 <Gurkenglas> Yep, that's an easier example of the sort of behavior I was
+                   going to demonstrate
+02:40 <deepfire`> that sounds exactly what I want!
+02:41 <deepfire`> ..and I have no idea how this works.. : -/
+02:41 <deepfire`> idnar, Gurkenglas, thanks a lot!
+02:41 <Gurkenglas> > traverseOf (_1._2) (fromJust . uncons) ((42,[1,2,3]), 56)
+                   -- deepfire`
+02:41 <lambdabot>  (1,((42,[2,3]),56))
+02:42 <Gurkenglas> > (_1._2) (fromJust . uncons) ((42,[1,2,3]), 56) -- in fact,
+                   that's all lenses do
+02:42 <lambdabot>  (1,((42,[2,3]),56))
+02:42 <idnar> traverseOf = id
+02:42 <deepfire`> but how did the lens managed to propagate the tuple.. hmm..
+02:42 <Gurkenglas> That's what the ((,) a) Applicative does
+02:43 <deepfire`> ..okay, given that I don't understand Applicatives yet, guess
+                  it's time to delay the explanation : -)
+02:43 <deepfire`> thank you folks!
+02:43 <Gurkenglas> *traversable. wait what? hmm i seem to have forgotten the
+                   words but not the concepts?
+02:44 <deepfire`> Gurkenglas: by the way, you have seemingly /hinted/ that you
+                  had a more general solution for the problem
+02:44 <deepfire`> to be honest, I was hoping I'd get something like 'over', not
+                  merely 'uncons'
+02:45 <Gurkenglas> deepfire`, what is the general problem you want to solve?
+                   Give me a type signature :D
+02:48 <deepfire`> I wanted to feed the (Lens' s a) an (a -> (a, a)), and get
+                  back (s, a), where the first value of type "a" would get
+                  substituted into "s", and the second value of type "a" would
+                  come as the second result
+02:49 <deepfire`> ..and I gently hope that I'm making sense here..
+02:49 <Gurkenglas> :t id :: Lens' s a -> (a -> (r, a)) -> s -> (r, s)
+02:49 <lambdabot> Lens' s a -> (a -> (r, a)) -> s -> (r, s)
+02:49 <Gurkenglas> Congratulations, you posed the trivial question :D
+02:50 <deepfire`> wait.. what? : -)
+02:50 <Roxxik> :i Lens
+02:51 <Roxxik> hmm seems not to work
+02:51 <Gurkenglas> That's all lenses do! type Lens s t a b = forall f. Functor
+                   f => (a -> f b) -> s -> f t
+02:51 <Gurkenglas> ((,) r) is a Functor, so you can do that
+02:52 <Roxxik> by the way: (%%~) = id, but looks nicer 
+02:52 <Roxxik> :t (%%~)
+02:52 <lambdabot> LensLike f s t a b -> (a -> f b) -> s -> f t
+02:53 <deepfire`> Gurkenglas: that signature seems like it has been burned into
+                  my mind, indeed -- yet I don't seem to grasp all of its
+                  implications yet..
+02:53 <Gurkenglas> In the "lenses are getter-setter-pairs" view, you extract
+                   the setter using "f = Identity" (for, after newtype
+                   unrolling and specialization, (a -> a) -> s -> s), and the
+                   getter using "f = Const" (after the same: (a -> r) -> s ->
+                   r)
+02:54 <deepfire`> yes, I guess I'm not familiar with all of the Functor
+                  instances yet.. particularly. with the tuple one
+02:55 <Gurkenglas> And a getter and a setter are enough to implement the "(a ->
+                   f a) -> s -> f s" stuff for any supplied functor
+02:55 <idnar> I'm still surprised from time to time with the tricks you can
+              pull using an opticu and a suitable Functor/etc. instance
+02:55 <idnar> even if it's an instance I'm already familiar with
+02:55 <Roxxik> i only really understood what lenses can do after replacing all
+               the type aliases with their definition (at least in my head)
+02:56 <Gurkenglas> And iirc anything you can do with getters and setters can be
+                   done in one application of the lens by supplying the correct
+                   functor
+02:56 <Gurkenglas> (For complicated enough things, you'd have to define your
+                   own functor)
+02:57 <deepfire`> this is incredibly cool, folks..
+02:57 <deepfire`> thank you everybody!
+02:58 <Gurkenglas> But for combining the (a -> r) -> s -> r and the (a -> a) ->
+                   s -> s into (a -> (r, a)) -> s -> (r, s), combining the r
+                   and the a into an (r, a) happens to already have the correct
+                   instances defined for it
+02:58 <Gurkenglas> (Helps that for all the simple data structures there is at
+                   most a single functor instance)
+02:58 <deepfire`> wait, (a -> r) -> s -> r ?
+02:59 <Roxxik> btw i came here for learning another bit about profunctor
+               lenses: i think profunctor lenses and van Laarhoven lenses are
+               mostly isomorphic, but i haven't yet been able to convert an
+               arbitary vL lens to a profunctor lens (or i didn't try hard
+               enough)
+02:59 <Gurkenglas> Yea, that allows you to extract any information that you can
+                   extract from the a from the s
+02:59 <deepfire`> Ah, the Const Functor instance
+02:59 <Gurkenglas> For example, you can extract an a from the a - by supplying
+                   id, (a -> r) -> s -> r becomes s -> a
+03:00 <Roxxik> this starts to get funny with Traversals, since they are only
+               Applicative if r is a Monoid ;)
+03:00 <Roxxik> so you can only extract a value from a Traversal by folding it
+03:01 <Roxxik> Const* (missed a word)
+03:01 <deepfire`> ..and that must be so, since there are arbitrarily many
+                  elements within a traversal?
+03:02 <deepfire`> there's where mempty and mappend come into play, where n = 0
+                  or n > 1
+03:02 <Roxxik> sure you can do Monoid r => (a -> r) -> s -> r (that's basically
+               foldMap from Foldable)
+03:03 <Roxxik> ah where n can be in the range 0..n for arbitary n
+03:03 <deepfire`> but what meaning is there in a lens that is a Traversal, but
+                  where 'a' has no Monoid instance?
+03:04 <deepfire`> I would guess it would simpy not type check.. or?
+03:04 <deepfire`> *simple
+03:04 <deepfire`> bah
+03:04 <Roxxik> one could define an extra Traversal where there is at least one
+               element: Semigroup r => Apply (Const r) and then it becomes:
+               Semigroup r => (a -> r) -> s -> r
+03:04 <Roxxik> every Lens is a valid Traversal
+03:05 <Roxxik> i'm not quite getting what you try to say
+03:05 <deepfire`> guess I'm trying to play the interpretation game in a field
+                  that is way over my head..
+03:05 <Gurkenglas> (a -> r) -> s -> r allows you to supply (:[]) instead of id,
+                   and then you get the list monoid which you can use to
+                   collect all traversed-over items :)
+03:06 <Roxxik> and there is even foldOfBy where it starts to get weird (in the
+               implementation)
+03:06 <Roxxik> :t foldOfBy
+03:06 <lambdabot> error:
+03:06 <lambdabot>     • Variable not in scope: foldOfBy
+03:06 <lambdabot>     • Perhaps you meant one of these:
+03:07 <Roxxik> :t foldByOf
+03:07 <lambdabot> Fold s a -> (a -> a -> a) -> a -> s -> a
+03:07 <Roxxik> or more acuratly foldMapByOf
+03:07 <Roxxik> :t foldMapByOf
+03:07 <lambdabot> Fold s a -> (r -> r -> r) -> r -> (a -> r) -> s -> r
+03:08 <Roxxik> :t \f -> foldMapByOf f (++) [] (:[])
+03:08 <lambdabot> error:
+03:08 <lambdabot>     • Couldn't match expected type ‘(a -> f a) -> s -> f s’
+03:08 <lambdabot>                   with actual type ‘t’
+03:08 <idnar> instead of using a Monoid instance, you pass in the mappend-like
+              and mempty-like things directly
+03:09 <Roxxik> yup but i started to look at how this is implemented and it was
+               really scary
+03:09 <idnar> and of course a Fold is a sort of reified Foldable instance
+03:09 <Roxxik> yes, that's why i like them so much (same with Traversal <->
+               Traversable)
